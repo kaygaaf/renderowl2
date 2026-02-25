@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "site": {
+      "url": "https://renderowl.com"
+    },
+    "live": {
+      "url": "https://api.renderowl.com/live"
+    },
+    "health": {
+      "url": "https://api.renderowl.com/health"
+    }
+  }
+}

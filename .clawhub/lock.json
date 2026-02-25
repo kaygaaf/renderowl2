@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "skills": {
+    "self-improving-agent": {
+      "version": "1.0.11",
+      "installedAt": 1771885959437
+    },
+    "humanizer": {
+      "version": "1.0.0",
+      "installedAt": 1771886180265
+    },
+    "frontend-design": {
+      "version": "1.0.0",
+      "installedAt": 1771886965980
+    },
+    "answeroverflow": {
+      "version": "1.0.2",
+      "installedAt": 1771887621509
+    },
+    "mcporter": {
+      "version": "1.0.0",
+      "installedAt": 1771887623183
+    },
+    "playwright-mcp": {
+      "version": "1.0.0",
+      "installedAt": 1771891049128
+    },
+    "agent-browser": {
+      "version": "0.2.0",
+      "installedAt": 1771891531022
+    },
+    "free-ride": {
+      "version": "1.0.4",
+      "installedAt": 1771975223857
+    }
+  }
+}

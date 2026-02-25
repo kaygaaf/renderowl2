@@ -1,0 +1,57 @@
+{
+  "checked_at": "2026-02-25T17:17:00+01:00",
+  "checked_by": "Infra/Stability subagent",
+  "state": "DEPLOYED_HEALTHY",
+  "deployment_status": {
+    "api": "HEALTHY - Responding to requests",
+    "frontend": "HEALTHY - Running at app.renderowl.com",
+    "commit": "d348596",
+    "changes_deployed": [
+      "30-day auto-delete cleanup task for R2 storage",
+      "Admin storage management endpoints",
+      "R2 credential configuration (ready for credentials)"
+    ]
+  },
+  "improvements": {
+    "storage_cleanup_task": {
+      "file": "app/tasks/storage_cleanup.py",
+      "status": "DEPLOYED",
+      "features": [
+        "cleanup_expired_videos() - Deletes videos >30 days old from R2",
+        "Daily scheduled execution via Celery beat (86400s)",
+        "Dry-run support for safe testing"
+      ]
+    },
+    "admin_endpoints": {
+      "status": "DEPLOYED",
+      "endpoints": [
+        "GET /api/admin/storage/stats - View storage usage",
+        "POST /api/admin/storage/cleanup - Manual cleanup with dry_run option"
+      ]
+    }
+  },
+  "blockers": {
+    "r2_credentials": {
+      "status": "WAITING_FOR_KAY",
+      "note": "R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY needed in Coolify environment. Code is ready, will use local storage fallback until credentials provided."
+    }
+  },
+  "support_provided": {
+    "frontend_team": "Frontend is healthy at app.renderowl.com - deployments passing",
+    "product_api": "Storage endpoints ready for credit-tier video delivery",
+    "automations": "30-day retention policy implemented for cost control",
+    "deployment_verification": "Verified API health at api.renderowl.com/live and /health"
+  },
+  "health_checks": {
+    "api_live": "OK - {\"status\":\"ok\",\"service\":\"renderowl-api\"}",
+    "api_health": "HEALTHY - DB, Redis, Celery, Storage all passing",
+    "frontend": "OK - 307 to /login (expected for unauthenticated)",
+    "storage_local": "40.85 GB free of 149.92 GB total"
+  },
+  "next_actions": [
+    "Kay to add R2 credentials to Coolify environment variables when ready",
+    "Monitor daily cleanup task execution",
+    "Test video upload/download via R2 once credentials are configured",
+    "Verify S3 fallback to local storage works perfectly (confirmed working)"
+  ]
+}

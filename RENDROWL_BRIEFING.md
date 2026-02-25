@@ -33,55 +33,56 @@ We are shifting from a pure subscription model to **credit-based pricing with us
 
 ---
 
-## 📋 Priority Feature Roadmap
+## 📋 Priority Feature Roadmap — AGGRESSIVE TIMELINE
 
-### Phase 1: Core Monetization (THIS WEEK)
+### Phase 1: Core Monetization (48 HOURS)
 **Owner: Product/API Surface + Frontend teams**
 
-1. **Credit System Backend**
+**Day 1 (Today):**
+1. **Credit System Backend** — Product/API
    - Add `credits_balance` to user model
-   - Credit deduction on video generation start
-   - Credit refund on generation failure
-   - Credit cost calculator endpoint (POST /api/calculate-cost)
+   - POST /api/calculate-cost endpoint
+   - GET /api/user/me with credits
 
-2. **Stripe Integration**
-   - €1 trial checkout flow
-   - Subscription management (upgrade/downgrade/cancel)
-   - Webhook handlers for payment events
-   - Trial expiration logic (7 days)
-
-3. **Frontend Credit UI**
+2. **Frontend UI** — Frontend (parallel)
    - Credit balance display in header
-   - "Insufficient credits" modal with upgrade CTA
-   - Cost preview before generating ("This video will cost 25 credits")
-   - Pricing page with credit calculator
+   - Cost preview before generation
+   - Pricing page
 
-### Phase 2: Automation Features (NEXT WEEK)
+**Day 2 (Tomorrow):**
+3. **Stripe Integration** — Product/API
+   - €1 trial checkout
+   - Webhook handlers
+   - Trial expiration logic
+
+4. **Credit Deduction Flow** — Automations/Queue
+   - Atomic credit deduction on job start
+   - Refund on failure
+
+### Phase 2: Automation Features (Days 3-5)
 **Owner: Automations/Queue team**
 
-1. **Scheduled Generation**
-   - Cron-based job scheduling
-   - User-defined schedule ("every Monday at 9am")
-   - Topic/title template with variables
+1. **YouTube Upload Integration**
+2. **Scheduled Generation**
 
-2. **YouTube Upload Integration**
-   - OAuth flow for YouTube connection
-   - Auto-upload on completion
-   - Title/description template support
-   - Privacy settings (public/unlisted/private)
-
-### Phase 3: Storage & Delivery (IN PROGRESS)
+### Phase 3: Storage & Delivery (Day 1-2)
 **Owner: Infra/Stability team**
 
-1. **S3/R2 Integration**
-   - ✅ Code deployed, needs credentials
-   - Upload videos to R2 after generation
-   - Presigned URL generation for downloads
-   - 30-day auto-delete (no emails, silent)
+1. **S3/R2 Integration** — ✅ Code done, needs credentials ASAP
+2. **30-day auto-delete**
 
-2. **Extended Storage Add-On**
-   - 5 credits/GB/month for keeping beyond 30 days
-   - Optional user feature
+---
+
+## ⚡ URGENCY RULES
+
+**No feature takes more than 2 days.** If it does:
+1. Cut scope
+2. Ship MVP
+3. Iterate later
+
+**Product/API is BLOCKING everyone** — prioritize their work first.
+
+**Push working code, not perfect code.** We can fix bugs in production.
 
 ---
 

@@ -1,0 +1,7 @@
+# OpenClaw workspace ignores
+/config/secrets.env
+/config/*.key
+/config/*.pem
+/config/*.p12
+/config/*.json
+.DS_Store

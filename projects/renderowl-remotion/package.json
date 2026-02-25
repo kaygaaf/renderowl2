@@ -1,0 +1,30 @@
+{
+  "name": "renderowl-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "remotion preview",
+    "render:captions": "tsx scripts/render-captions.ts",
+    "server": "tsx src/server/index.ts",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.268",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "^4.0.268",
+    "@remotion/renderer": "^4.0.268",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

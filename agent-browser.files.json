@@ -1,0 +1,57 @@
+{
+  "skill": {
+    "slug": "agent-browser",
+    "displayName": "Agent Browser",
+    "summary": "A fast Rust-based headless browser automation CLI with Node.js fallback that enables AI agents to navigate, click, type, and snapshot pages via structured commands.",
+    "tags": {
+      "automation": "0.1.0",
+      "browser": "0.1.0",
+      "headless": "0.1.0",
+      "latest": "0.2.0",
+      "web": "0.1.0"
+    },
+    "stats": {
+      "comments": 1,
+      "downloads": 25761,
+      "installsAllTime": 247,
+      "installsCurrent": 238,
+      "stars": 127,
+      "versions": 2
+    },
+    "createdAt": 1768170466579,
+    "updatedAt": 1771891235879
+  },
+  "latestVersion": {
+    "version": "0.2.0",
+    "createdAt": 1768882342488,
+    "changelog": "**Big update: Expanded documentation and new contribution guidelines.**\n\n- Added a CONTRIBUTING.md file with guidelines for contributors.\n- Significantly revised and expanded SKILL.md:\n  - Clearer structure, concise “Quick start,” and streamlined “Core workflow.”\n  - Added or reorganized sections: video recording, mouse control, semantic locators, browser settings, cookies/storage, network, tabs, frames, dialogs, JS, and session state management.\n  - More comprehensive examples and improved command explanations.\n- Introduced allowed-tools field in SKILL.md for clearer operational context."
+  },
+  "owner": {
+    "handle": "TheSethRose",
+    "userId": "kn72ce44tqw8bnnnewrn1s5x3s7yz7sq",
+    "displayName": "Seth Rose",
+    "image": "https://avatars.githubusercontent.com/u/10383809?v=4"
+  },
+  "version": {
+    "version": "0.2.0",
+    "createdAt": 1768882342488,
+    "changelog": "**Big update: Expanded documentation and new contribution guidelines.**\n\n- Added a CONTRIBUTING.md file with guidelines for contributors.\n- Significantly revised and expanded SKILL.md:\n  - Clearer structure, concise “Quick start,” and streamlined “Core workflow.”\n  - Added or reorganized sections: video recording, mouse control, semantic locators, browser settings, cookies/storage, network, tabs, frames, dialogs, JS, and session state management.\n  - More comprehensive examples and improved command explanations.\n- Introduced allowed-tools field in SKILL.md for clearer operational context.",
+    "changelogSource": "auto",
+    "files": [
+      {
+        "path": "CONTRIBUTING.md",
+        "size": 1626,
+        "sha256": "6aa2ff6c195842f5013eed3ca2d563ec9fef63bb4fb9b2f0038e13bccc0a65ce",
+        "contentType": "text/markdown"
+      },
+      {
+        "path": "SKILL.md",
+        "size": 10224,
+        "sha256": "04afeeb53a8b6ab953974311ec7ed60e0d66c532341ca21933625320f28b01c6",
+        "contentType": "text/markdown"
+      }
+    ]
+  },
+  "versions": null,
+  "file": null
+}

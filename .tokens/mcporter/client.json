@@ -1,0 +1,16 @@
+{
+  "redirect_uris": [
+    "http://127.0.0.1:17171/callback"
+  ],
+  "token_endpoint_auth_method": "none",
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "response_types": [
+    "code"
+  ],
+  "client_name": "openclaw-kayorama",
+  "client_id": "Ko4fHnuImlahzjrZ",
+  "client_id_issued_at": 1771894560
+}
