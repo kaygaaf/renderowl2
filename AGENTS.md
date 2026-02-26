@@ -2,15 +2,40 @@
 
 ## ⚠️ MANDATORY CHECKLIST BEFORE EVERY TASK:
 
-1. **Which skill should I use?** - Check available skills first
-2. **Which MCP server has access?** - Use mcporter for Coolify, not curl
-3. **What did the user tell me before?** - Check MEMORY.md and daily notes
-4. **Did I verify it works?** - Test before claiming success
+**RUN THIS FIRST:**
+```bash
+# Check available tools
+agents_list
+mcporter list
 
-**USER PREFERENCES (DO NOT FORGET):**
-- Only Kimi model, NO fallbacks
-- Timeout is the issue, NOT concurrency
-- Use skills and MCP servers, not manual workarounds
+# Read this file
+read /Users/minion/.openclaw/workspace/REMINDER.md
+```
+
+### 1. **Which skill should I use?** 
+- Check `available_skills` 
+- Read the `SKILL.md` before using ANY tool
+- **DO NOT GUESS**
+
+### 2. **Which MCP server has access?** 
+- Use `mcporter` for Coolify, NOT curl
+- Use `gh` CLI for GitHub, not API calls
+- **USE THE RIGHT TOOL**
+
+### 3. **What did the user tell me before?** 
+- Check `MEMORY.md` for long-term preferences
+- Check `memory/YYYY-MM-DD.md` for recent context
+- **READ BEFORE ACTING**
+
+### 4. **Did I verify it works?** 
+- Test with curl/browser before saying "it works"
+- Check for 504 errors
+- **VERIFY BEFORE CLAIMING SUCCESS**
+
+### **USER PREFERENCES (DO NOT FORGET):**
+- ✅ **Only Kimi model**, NO fallbacks
+- ✅ **Timeout is the issue**, NOT concurrency  
+- ✅ **Use skills and MCP servers**, not manual workarounds
 
 ---
 
