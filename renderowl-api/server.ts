@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import path from 'path';
@@ -11,6 +12,16 @@ import automationRoutes from './routes/automations.js';
 import userRoutes from './routes/user.js';
 import creditsRoutes from './routes/credits.js';
 import stripeRoutes from './routes/stripe.js';
+import webhookRoutes from './routes/webhooks.js';
+import apiKeyRoutes from './routes/apikeys.js';
+import batchRoutes from './routes/batch.js';
+import docsRoutes from './routes/docs.js';
+import integrationRoutes from './routes/integrations.js';
+import youtubeRoutes from './routes/youtube.js';
+import rssRoutes from './routes/rss.js';
+import templateRoutes from './routes/templates.js';
+import rateLimitPlugin from './lib/ratelimit/index.js';
+import { apiKeyAuthPlugin } from './lib/apikeys/index.js';
 import { JobQueue } from './lib/queue.js';
 import { AutomationRunner } from './lib/automation-runner.js';
 
@@ -105,8 +116,10 @@ fastify.addHook('onResponse', async (request, reply) => {
 });
 
 // Register plugins
+await fastify.register(helmet, { contentSecurityPolicy: false }); // Add security headers (helmet)
+
 await fastify.register(cors, {
-  origin: process.env.CORS_ORIGIN || true,
+  origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'development' ? true : ['https://app.renderowl.com', 'https://renderowl.com']),
   credentials: true,
 });
 
@@ -117,6 +130,19 @@ await fastify.register(jwt, {
 // Decorate fastify with queue and runner for access in routes
 fastify.decorate('jobQueue', jobQueue);
 fastify.decorate('automationRunner', automationRunner);
+
+// Register rate limiting
+await fastify.register(rateLimitPlugin, {
+  dbPath: path.join(__dirname, '../data/ratelimit.db'),
+});
+
+// Register API key auth (adds API key authentication support)
+await fastify.register(apiKeyAuthPlugin, {
+  dbPath: path.join(__dirname, '../data/apikeys.db'),
+});
+
+// Register docs routes (public)
+await fastify.register(docsRoutes, { prefix: '/docs' });
 
 // Health check endpoint
 fastify.get('/health', async () => {
@@ -164,15 +190,24 @@ fastify.get('/queue/stats', async () => {
 // API v1 routes
 await fastify.register(
   async function (api) {
-    // Auth hook (simplified - validates Bearer token exists)
+    // Auth hook - validates Bearer token OR API key
     api.addHook('onRequest', async (request, reply) => {
       const auth = request.headers.authorization;
+      const apiKey = request.headers['x-api-key'];
+
+      // Check for API key first
+      if (apiKey && typeof apiKey === 'string') {
+        // API key auth handled by apiKeyAuthPlugin
+        return;
+      }
+
+      // Check for Bearer token
       if (!auth || !auth.startsWith('Bearer ')) {
         reply.status(401).send({
           type: 'https://api.renderowl.com/errors/unauthorized',
           title: 'Unauthorized',
           status: 401,
-          detail: 'Bearer token required',
+          detail: 'Bearer token or API key required',
           instance: request.url,
         });
         return;
@@ -182,6 +217,7 @@ await fastify.register(
       request.user = {
         id: 'user_dev123',
         email: 'dev@renderowl.com',
+        tier: 'pro',
       };
     });
 
@@ -192,8 +228,14 @@ await fastify.register(
     await api.register(automationRoutes, { prefix: '/projects/:project_id/automations' });
     await api.register(userRoutes, { prefix: '/user' });
     await api.register(creditsRoutes, { prefix: '/credits' });
-    // Stripe buy-credits (authenticated)
     await api.register(stripeRoutes, { prefix: '/stripe' });
+    await api.register(webhookRoutes, { prefix: '/webhooks' });
+    await api.register(apiKeyRoutes, { prefix: '/user/api-keys' });
+    await api.register(batchRoutes, { prefix: '/batch' });
+    await api.register(integrationRoutes, { prefix: '/integrations' });
+    await api.register(youtubeRoutes, { prefix: '/youtube' });
+    await api.register(rssRoutes, { prefix: '/rss' });
+    await api.register(templateRoutes, { prefix: '/templates' });
   },
   { prefix: '/v1' }
 );
@@ -225,7 +267,7 @@ await fastify.post('/v1/stripe/webhook', {
 
 // Global error handler
 fastify.setErrorHandler((error: any, request, reply) => {
-  fastify.log.error(error);
+  fastify.log.error({ err: error, reqId: request.id }, 'Unhandled Error');
 
   if (error.validation) {
     return reply.status(400).send({
@@ -237,11 +279,13 @@ fastify.setErrorHandler((error: any, request, reply) => {
     });
   }
 
+  // Prevent leaking stack traces or sensitive errors in production
+  const isDev = process.env.NODE_ENV === 'development';
   return reply.status(500).send({
     type: 'https://api.renderowl.com/errors/internal-error',
     title: 'Internal Server Error',
     status: 500,
-    detail: error.message || 'An unexpected error occurred',
+    detail: isDev ? error.message : 'An unexpected internal error occurred. Please contact support.',
     instance: request.url,
   });
 });
