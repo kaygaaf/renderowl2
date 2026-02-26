@@ -1,15 +1,16 @@
 {
-  "checked_at": "2026-02-25T17:17:00+01:00",
+  "checked_at": "2026-02-25T21:17:00+01:00",
   "checked_by": "Infra/Stability subagent",
   "state": "DEPLOYED_HEALTHY",
   "deployment_status": {
     "api": "HEALTHY - Responding to requests",
-    "frontend": "HEALTHY - Running at app.renderowl.com",
-    "commit": "d348596",
+    "frontend": "HEALTHY - Running at app.renderowl.com (307 to /login expected)",
+    "commit": "c8e3d1f",
     "changes_deployed": [
       "30-day auto-delete cleanup task for R2 storage",
       "Admin storage management endpoints",
-      "R2 credential configuration (ready for credentials)"
+      "R2 credential configuration (ready for credentials)",
+      "Local storage fallback verified working"
     ]
   },
   "improvements": {
@@ -28,12 +29,21 @@
         "GET /api/admin/storage/stats - View storage usage",
         "POST /api/admin/storage/cleanup - Manual cleanup with dry_run option"
       ]
+    },
+    "s3_storage_service": {
+      "status": "DEPLOYED",
+      "features": [
+        "S3-compatible client for Cloudflare R2",
+        "Presigned URL generation for secure downloads",
+        "Streaming URL support",
+        "Graceful fallback to local storage when R2 not configured"
+      ]
     }
   },
   "blockers": {
     "r2_credentials": {
       "status": "WAITING_FOR_KAY",
-      "note": "R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY needed in Coolify environment. Code is ready, will use local storage fallback until credentials provided."
+      "note": "R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY needed in Coolify environment. Code is ready, using local storage fallback until credentials provided."
     }
   },
   "support_provided": {
@@ -43,15 +53,17 @@
     "deployment_verification": "Verified API health at api.renderowl.com/live and /health"
   },
   "health_checks": {
-    "api_live": "OK - {\"status\":\"ok\",\"service\":\"renderowl-api\"}",
-    "api_health": "HEALTHY - DB, Redis, Celery, Storage all passing",
+    "api_live": "OK - {\"status\":\"ok\",\"service\":\"renderowl-api\",\"timestamp\":\"2026-02-25T20:18:48+00:00\"}",
+    "api_health": "HEALTHY - DB, Redis, Celery, Storage all passing (response_time_ms: 2061.5)",
     "frontend": "OK - 307 to /login (expected for unauthenticated)",
-    "storage_local": "40.85 GB free of 149.92 GB total"
+    "storage_local": "28.97 GB free of 149.92 GB total",
+    "storage_r2": "NOT_CONFIGURED - Waiting for credentials"
   },
   "next_actions": [
     "Kay to add R2 credentials to Coolify environment variables when ready",
     "Monitor daily cleanup task execution",
     "Test video upload/download via R2 once credentials are configured",
     "Verify S3 fallback to local storage works perfectly (confirmed working)"
-  ]
+  ],
+  "last_deployment_check": "2026-02-25T21:17:00+01:00"
 }

@@ -237,6 +237,47 @@ const checkCreditsHandler = async (
 };
 
 // ============================================================================
+// Get Current User's Credit Balance (for Frontend)
+// ============================================================================
+
+const getBalanceHandler = async (
+  request: FastifyRequest,
+  reply: FastifyReply
+) => {
+  const userId = (request.user as any)?.id;
+  if (!userId) {
+    return reply.status(401).send({
+      type: 'https://api.renderowl.com/errors/unauthorized',
+      title: 'Unauthorized',
+      status: 401,
+      detail: 'User not authenticated',
+      instance: '/credits/balance',
+    });
+  }
+
+  const user = getUserById(userId);
+
+  if (!user) {
+    return reply.status(404).send({
+      type: 'https://api.renderowl.com/errors/not-found',
+      title: 'User Not Found',
+      status: 404,
+      detail: `User with ID "${userId}" does not exist`,
+      instance: '/credits/balance',
+    });
+  }
+
+  return reply.send({
+    user_id: userId,
+    credits_balance: user.credits_balance,
+    plan_tier: user.plan_tier,
+    trial_expires_at: user.trial_expires_at,
+    subscription_status: user.subscription_status,
+    subscription_expires_at: user.subscription_expires_at,
+  });
+};
+
+// ============================================================================
 // Plugin Definition
 // ============================================================================
 
@@ -244,6 +285,9 @@ export default async function creditsRoutes(
   fastify: FastifyInstance,
   _opts: FastifyPluginOptions
 ) {
+  // GET /credits/balance - Get current user's credit balance (Frontend)
+  fastify.get('/balance', getBalanceHandler);
+
   // POST /credits/calculate-cost - Calculate credit cost for video
   fastify.post('/calculate-cost', calculateCost);
 

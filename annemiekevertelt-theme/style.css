@@ -1,0 +1,391 @@
+/*
+Theme Name: Annemieke Vertelt
+*/
+
+/* ===== CSS Variables ===== */
+:root {
+    --color-bg: #f5f5f0;
+    --color-text: #333;
+    --color-accent: #e74c3c;
+    --color-column: #3498db;
+    --color-kinderen: #e91e63;
+    --color-audio: #9c27b0;
+    --color-wiebenik: #4caf50;
+    --font-heading: 'Georgia', 'Times New Roman', serif;
+    --font-body: 'Helvetica Neue', Arial, sans-serif;
+    --max-width: 1200px;
+    --column-gap: 2rem;
+}
+
+/* ===== Reset & Base ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Header ===== */
+.site-header {
+    text-align: center;
+    padding: 3rem 1rem 2rem;
+    position: relative;
+}
+
+.site-title {
+    font-family: var(--font-heading);
+    font-size: 3rem;
+    font-weight: normal;
+    color: var(--color-text);
+    text-decoration: none;
+    display: inline-block;
+}
+
+.site-title:hover {
+    color: var(--color-accent);
+}
+
+.site-title::after {
+    content: '...';
+    color: var(--color-accent);
+}
+
+/* Hamburger menu */
+.menu-toggle {
+    position: absolute;
+    top: 2rem;
+    left: 2rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+}
+
+.menu-toggle span {
+    display: block;
+    width: 25px;
+    height: 3px;
+    background: var(--color-text);
+    margin: 5px 0;
+    transition: 0.3s;
+}
+
+/* ===== Main Layout ===== */
+.site-main {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* ===== Category Columns ===== */
+.category-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--column-gap);
+    margin: 3rem 0;
+}
+
+.category-column {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+}
+
+.category-column:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.category-column.columns { border-top: 5px solid var(--color-column); }
+.category-column.kinderverhalen { border-top: 5px solid var(--color-kinderen); }
+.category-column.audio { border-top: 5px solid var(--color-audio); }
+.category-column.wie-ben-ik { border-top: 5px solid var(--color-wiebenik); }
+
+.category-header {
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.category-title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: normal;
+}
+
+.category-column.columns .category-title { color: var(--color-column); }
+.category-column.kinderverhalen .category-title { color: var(--color-kinderen); }
+.category-column.audio .category-title { color: var(--color-audio); }
+.category-column.wie-ben-ik .category-title { color: var(--color-wiebenik); }
+
+.category-preview {
+    padding: 1rem 1.5rem;
+    min-height: 200px;
+    background: linear-gradient(to bottom, #fafafa, #f0f0f0);
+}
+
+.category-preview-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px dashed #ddd;
+    font-size: 0.9rem;
+}
+
+.category-preview-item:last-child {
+    border-bottom: none;
+}
+
+/* ===== Post Grid (inside columns) ===== */
+.post-grid {
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    padding: 1.5rem;
+    animation: fadeIn 0.5s ease;
+}
+
+.post-grid.active {
+    display: grid;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.post-card {
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.post-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+
+.post-card img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+}
+
+.post-card-title {
+    padding: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+/* ===== Missed Posts Section ===== */
+.missed-posts {
+    background: white;
+    padding: 2rem;
+    margin: 3rem 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.missed-title {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: normal;
+    font-style: italic;
+    color: #666;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.missed-list {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.missed-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-decoration: none;
+    color: var(--color-text);
+    padding: 0.75rem;
+    background: #f9f9f9;
+    border-radius: 6px;
+    transition: background 0.3s;
+    max-width: 300px;
+}
+
+.missed-item:hover {
+    background: #f0f0f0;
+}
+
+.missed-item img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+/* ===== Article/Page Turn Effect ===== */
+.page-turn-container {
+    perspective: 1500px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.page-turn-container.active {
+    display: flex;
+}
+
+.page-turn-content {
+    background: white;
+    max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 3rem;
+    border-radius: 4px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    transform-origin: left center;
+    animation: pageTurn 0.6s ease;
+}
+
+@keyframes pageTurn {
+    0% {
+        transform: rotateY(-90deg);
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: rotateY(0deg);
+    }
+}
+
+.page-turn-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: white;
+    z-index: 1001;
+}
+
+/* ===== Navigation ===== */
+.main-navigation {
+    position: fixed;
+    top: 0;
+    left: -300px;
+    width: 300px;
+    height: 100%;
+    background: white;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    z-index: 999;
+    transition: left 0.3s ease;
+    padding: 2rem;
+}
+
+.main-navigation.active {
+    left: 0;
+}
+
+.main-navigation ul {
+    list-style: none;
+}
+
+.main-navigation li {
+    margin: 1rem 0;
+}
+
+.main-navigation a {
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: 1.1rem;
+    transition: color 0.3s;
+}
+
+.main-navigation a:hover {
+    color: var(--color-accent);
+}
+
+.nav-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 998;
+    display: none;
+}
+
+.nav-overlay.active {
+    display: block;
+}
+
+/* ===== Footer ===== */
+.site-footer {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+    .site-title {
+        font-size: 2rem;
+    }
+    
+    .category-columns {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-turn-content {
+        padding: 1.5rem;
+    }
+}
+
+/* ===== Print Styles ===== */
+@media print {
+    .menu-toggle,
+    .main-navigation,
+    .nav-overlay {
+        display: none !important;
+    }
+    
+    .page-turn-container {
+        position: static;
+        display: block !important;
+        background: none;
+    }
+    
+    .page-turn-content {
+        box-shadow: none;
+        max-height: none;
+    }
+}

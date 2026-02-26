@@ -117,6 +117,17 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
 
+**CRITICAL - Lessons Learned:**
+
+1. **Always read SKILL.md first** - Don't guess how a tool works
+2. **MCP servers are available** - Use `mcporter` for Coolify, not just REST API
+3. **Test before claiming success** - Don't say "it's working" until you've verified
+4. **Use API keys, not cookies** - For video/streaming, API key auth is more reliable
+5. **Check for 504 errors** - If API returns 504, something is hanging/crashing
+6. **Have rollback ready** - Know the stable commit hash before deploying
+7. **Use browser to verify** - For frontend changes, actually open the browser and check
+8. **Read WORKFLOW.md** - Each project has specific deployment procedures
+
 **🎭 Voice Storytelling:** If you have `sag` (ElevenLabs TTS), use voice for stories, movie summaries, and "storytime" moments! Way more engaging than walls of text. Surprise people with funny voices.
 
 **📝 Platform Formatting:**
