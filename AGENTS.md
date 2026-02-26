@@ -8,13 +8,19 @@
 agents_list
 mcporter list
 
-# Read this file
+# Read reminders
 read /Users/minion/.openclaw/workspace/REMINDER.md
+
+# Review learnings
+cat /Users/minion/.openclaw/workspace/.learnings/LEARNINGS.md | head -50
 ```
 
 ### 1. **Which skill should I use?** 
 - Check `available_skills` 
 - Read the `SKILL.md` before using ANY tool
+- Use `mcporter` for Coolify (NOT curl)
+- Use `playwright-mcp` for browser automation
+- Use `self-improving-agent` to log learnings/errors
 - **DO NOT GUESS**
 
 ### 2. **Which MCP server has access?** 
@@ -23,6 +29,8 @@ read /Users/minion/.openclaw/workspace/REMINDER.md
 - **USE THE RIGHT TOOL**
 
 ### 3. **What did the user tell me before?** 
+- Check `.learnings/LEARNINGS.md` for past mistakes
+- Check `.learnings/ERRORS.md` for resolved issues
 - Check `MEMORY.md` for long-term preferences
 - Check `memory/YYYY-MM-DD.md` for recent context
 - **READ BEFORE ACTING**
@@ -36,6 +44,7 @@ read /Users/minion/.openclaw/workspace/REMINDER.md
 - ✅ **Only Kimi model**, NO fallbacks
 - ✅ **Timeout is the issue**, NOT concurrency  
 - ✅ **Use skills and MCP servers**, not manual workarounds
+- ✅ **Log learnings** using self-improving-agent
 
 ---
 
