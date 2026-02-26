@@ -1,6 +1,18 @@
 # AGENTS.md - Your Workspace
 
-This folder is home. Treat it that way.
+## ⚠️ MANDATORY CHECKLIST BEFORE EVERY TASK:
+
+1. **Which skill should I use?** - Check available skills first
+2. **Which MCP server has access?** - Use mcporter for Coolify, not curl
+3. **What did the user tell me before?** - Check MEMORY.md and daily notes
+4. **Did I verify it works?** - Test before claiming success
+
+**USER PREFERENCES (DO NOT FORGET):**
+- Only Kimi model, NO fallbacks
+- Timeout is the issue, NOT concurrency
+- Use skills and MCP servers, not manual workarounds
+
+---
 
 ## First Run
 
