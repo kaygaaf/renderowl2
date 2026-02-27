@@ -230,11 +230,73 @@ Expected output:
 ✨ Tests complete!
 ```
 
+## TypeScript and Build Fixes (Feb 2026 Bug Hunt)
+
+### 11. SQL Statement Argument Passing ✅
+**Severity:** CRITICAL - Would cause runtime errors
+**File:** `lib/enhanced-queue.ts`
+
+**Problem:** better-sqlite3's `.run()` method expects a single array argument, but the code was passing multiple separate arguments:
+```typescript
+// WRONG - causes runtime error
+stmt.run(arg1, arg2, arg3);
+
+// CORRECT
+stmt.run([arg1, arg2, arg3]);
+```
+
+**Solution:** Fixed all 20+ SQL statement calls to use array syntax.
+
+### 12. Duplicate Export Declarations ✅
+**Severity:** MEDIUM - TypeScript compilation errors
+**Files:** `lib/monitoring.ts`, `lib/security.ts`
+
+**Problem:** Classes and functions declared with `export` keyword were also exported again at the bottom of files, causing TS2323/TS2484 errors.
+
+**Solution:** Removed duplicate export declarations at file bottoms.
+
+### 13. Unused Imports and Variables ✅
+**Severity:** LOW - Code cleanup
+**Files:** `lib/cache.ts`, `lib/errors.ts`, `lib/monitoring.ts`, `server-enhanced.ts`
+
+**Problem:** Several imports and variables declared but never used.
+
+**Solution:** Removed all unused code.
+
+### 14. EnhancedJobQueue Type Compatibility ✅
+**Severity:** MEDIUM - TypeScript type errors
+**Files:** `lib/enhanced-queue.ts`, `lib/automation-runner.ts`, `server-enhanced.ts`
+
+**Problem:** `EnhancedJobQueue` couldn't be used where `JobQueue` was expected due to different private properties and missing methods.
+
+**Solution:**
+- Added `retryConfig` getter for compatibility
+- Added `updateStepState()` and `getStepState()` methods
+- Updated `AutomationRunner` to accept both types
+
+### 15. CORS Origins Comparison Bug ✅
+**Severity:** LOW - Unreachable code
+**File:** `lib/security.ts`
+
+**Problem:** Comparison `config.corsOrigins === '*'` would never be true since type is `string[]`.
+
+**Solution:** Removed unreachable code path.
+
+---
+
+## Updated Build Status
+
+- ✅ TypeScript compilation: **PASSED**
+- ✅ All tests: **22 PASSED** (0 failed)
+- ✅ No TypeScript errors
+- ✅ No ESLint warnings (for fixed files)
+
+---
+
 ## Remaining Issues (Out of Scope)
 
 1. **In-Memory Storage:** All data stored in Maps, lost on restart
 2. **Credit Deduction Race Condition:** Still theoretical race between check and deduct
-3. **TypeScript Errors:** Several files have pre-existing type errors (enhanced-queue.ts, monitoring.ts, security.ts)
 
 ## Security Checklist
 
