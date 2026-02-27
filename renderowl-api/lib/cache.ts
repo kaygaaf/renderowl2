@@ -321,10 +321,10 @@ export class CacheService extends EventEmitter {
     `).all(Math.ceil(this.config.maxSize * 0.1)); // Evict 10% at a time
 
     for (const row of toEvict as any[]) {
-      this.db.prepare('DELETE FROM cache_entries WHERE key = ?').run(row.key);
+      this.db.prepare('DELETE FROM cache_entries WHERE key = ?').run([row.key]);
     }
 
-    this.db.prepare('UPDATE cache_stats SET evictions = evictions + ? WHERE id = 1').run(toEvict.length);
+    this.db.prepare('UPDATE cache_stats SET evictions = evictions + ? WHERE id = 1').run([toEvict.length]);
     this.emit('cache:evict', { count: toEvict.length });
   }
 
@@ -332,10 +332,10 @@ export class CacheService extends EventEmitter {
     const now = Date.now();
     const result = this.db.prepare(
       'DELETE FROM cache_entries WHERE expires_at <= ?'
-    ).run(now);
+    ).run([now]);
 
     if (result.changes > 0) {
-      this.db.prepare('UPDATE cache_stats SET expired = expired + ? WHERE id = 1').run(result.changes);
+      this.db.prepare('UPDATE cache_stats SET expired = expired + ? WHERE id = 1').run([result.changes]);
       this.emit('cache:expired', { count: result.changes });
     }
   }
