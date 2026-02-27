@@ -2,7 +2,7 @@
 // Analytics & Reporting System
 // ============================================================================
 // Provides user-facing analytics for renders, usage, and performance metrics
-import Database from 'better-sqlite3';
+import { DatabaseOptimizer } from '../lib/db-optimizer.js';
 // ============================================================================
 // Database Schema
 // ============================================================================
@@ -66,8 +66,13 @@ CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at
 export class AnalyticsService {
     db;
     constructor(dbPath) {
-        this.db = new Database(dbPath);
-        this.db.exec(ANALYTICS_SCHEMA_SQL);
+        this.db = new DatabaseOptimizer(dbPath, {
+            cacheEnabled: true,
+            cacheSize: 500,
+            defaultCacheTtl: 30000, // 30 seconds for analytics
+            slowQueryThreshold: 200,
+        });
+        this.db.getConnection().exec(ANALYTICS_SCHEMA_SQL);
     }
     // --------------------------------------------------------------------------
     // Event Tracking
@@ -82,10 +87,8 @@ export class AnalyticsService {
             eventData: params.eventData || {},
             createdAt: new Date().toISOString(),
         };
-        this.db.prepare(`
-      INSERT INTO analytics_events (id, user_id, project_id, event_type, event_data, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(event.id, event.userId, event.projectId || null, event.eventType, JSON.stringify(event.eventData), event.createdAt);
+        this.db.run(`INSERT INTO analytics_events (id, user_id, project_id, event_type, event_data, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)`, [event.id, event.userId, event.projectId || null, event.eventType, JSON.stringify(event.eventData), event.createdAt]);
         return event;
     }
     // --------------------------------------------------------------------------
@@ -93,8 +96,7 @@ export class AnalyticsService {
     // --------------------------------------------------------------------------
     updateDailyStats(params) {
         const id = `stats_${params.userId}_${params.date}`;
-        this.db.prepare(`
-      INSERT INTO analytics_daily (
+        this.db.run(`INSERT INTO analytics_daily (
         id, user_id, date, renders_total, renders_completed, renders_failed, renders_cancelled,
         total_duration_seconds, total_frames_rendered, credits_used, storage_bytes_used
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -107,8 +109,9 @@ export class AnalyticsService {
         total_frames_rendered = total_frames_rendered + COALESCE(excluded.total_frames_rendered, 0),
         credits_used = credits_used + COALESCE(excluded.credits_used, 0),
         storage_bytes_used = storage_bytes_used + COALESCE(excluded.storage_bytes_used, 0),
-        updated_at = datetime('now')
-    `).run(id, params.userId, params.date, params.rendersTotal || 0, params.rendersCompleted || 0, params.rendersFailed || 0, params.rendersCancelled || 0, params.durationSeconds || 0, params.framesRendered || 0, params.creditsUsed || 0, params.storageBytes || 0);
+        updated_at = datetime('now')`, [id, params.userId, params.date, params.rendersTotal || 0, params.rendersCompleted || 0,
+            params.rendersFailed || 0, params.rendersCancelled || 0, params.durationSeconds || 0,
+            params.framesRendered || 0, params.creditsUsed || 0, params.storageBytes || 0]);
     }
     // --------------------------------------------------------------------------
     // Stats Queries
@@ -141,23 +144,24 @@ export class AnalyticsService {
             query += ` AND created_at <= ?`;
             params.push(toDate);
         }
-        const result = this.db.prepare(query).get(...params);
-        const total = result.total || 0;
-        const completed = result.completed || 0;
+        const result = this.db.querySingle(query, params);
+        const total = result?.total || 0;
+        const completed = result?.completed || 0;
         return {
             totalRenders: total,
             completedRenders: completed,
-            failedRenders: result.failed || 0,
-            cancelledRenders: result.cancelled || 0,
+            failedRenders: result?.failed || 0,
+            cancelledRenders: result?.cancelled || 0,
             completionRate: total > 0 ? Math.round((completed / total) * 1000) / 10 : 0,
-            averageRenderDuration: Math.round((result.avg_duration || 0) * 100) / 100,
-            totalFramesRendered: result.total_frames || 0,
-            totalCreditsUsed: result.total_credits || 0,
+            averageRenderDuration: Math.round((result?.avg_duration || 0) * 100) / 100,
+            totalFramesRendered: result?.total_frames || 0,
+            totalCreditsUsed: result?.total_credits || 0,
         };
     }
     getDailyStats(userId, days = 30) {
-        const results = this.db.prepare(`
-      SELECT 
+        // Clamp days to reasonable range to prevent abuse
+        const clampedDays = Math.min(Math.max(days, 1), 365);
+        const results = this.db.query(`SELECT 
         date,
         renders_total,
         renders_completed,
@@ -169,9 +173,8 @@ export class AnalyticsService {
         storage_bytes_used
       FROM analytics_daily
       WHERE user_id = ?
-        AND date >= date('now', '-${days} days')
-      ORDER BY date DESC
-    `).all(userId);
+        AND date >= date('now', ?)
+      ORDER BY date DESC`, [userId, `-${clampedDays} days`]);
         return results.map(r => ({
             date: r.date,
             rendersTotal: r.renders_total,
@@ -185,6 +188,9 @@ export class AnalyticsService {
         }));
     }
     getTimeSeriesData(userId, metric, days = 30, projectId) {
+        // Clamp days to reasonable range
+        const clampedDays = Math.min(Math.max(days, 1), 365);
+        const daysParam = `-${clampedDays} days`;
         const metricColumn = {
             renders: 'renders_total',
             credits: 'credits_used',
@@ -200,32 +206,29 @@ export class AnalyticsService {
         FROM renders
         WHERE user_id = ?
           AND project_id = ?
-          AND created_at >= date('now', '-${days} days')
+          AND created_at >= date('now', ?)
         GROUP BY date(created_at)
         ORDER BY date
       `;
-            const results = this.db.prepare(query).all(userId, projectId);
+            const results = this.db.query(query, [userId, projectId, daysParam]);
             return results.map(r => ({
                 timestamp: r.date,
                 value: r.value,
             }));
         }
         // Otherwise use aggregated daily stats
-        const results = this.db.prepare(`
-      SELECT date, ${metricColumn} as value
+        const results = this.db.query(`SELECT date, ${metricColumn} as value
       FROM analytics_daily
       WHERE user_id = ?
-        AND date >= date('now', '-${days} days')
-      ORDER BY date
-    `).all(userId);
+        AND date >= date('now', ?)
+      ORDER BY date`, [userId, daysParam]);
         return results.map(r => ({
             timestamp: r.date,
             value: r.value,
         }));
     }
     getProjectComparison(userId) {
-        return this.db.prepare(`
-      SELECT 
+        return this.db.query(`SELECT 
         p.id as project_id,
         p.name as project_name,
         COUNT(r.id) as render_count,
@@ -239,8 +242,7 @@ export class AnalyticsService {
       WHERE p.user_id = ?
         AND p.deleted_at IS NULL
       GROUP BY p.id
-      ORDER BY render_count DESC
-    `).all(userId);
+      ORDER BY render_count DESC`, [userId]);
     }
     // --------------------------------------------------------------------------
     // Notifications
@@ -257,10 +259,10 @@ export class AnalyticsService {
             read: false,
             createdAt: new Date().toISOString(),
         };
-        this.db.prepare(`
-      INSERT INTO notifications (id, user_id, type, title, message, data, read, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(notification.id, notification.userId, notification.type, notification.title, notification.message, notification.data ? JSON.stringify(notification.data) : null, notification.read ? 1 : 0, notification.createdAt);
+        this.db.run(`INSERT INTO notifications (id, user_id, type, title, message, data, read, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [notification.id, notification.userId, notification.type, notification.title,
+            notification.message, notification.data ? JSON.stringify(notification.data) : null,
+            notification.read ? 1 : 0, notification.createdAt]);
         return notification;
     }
     getNotifications(userId, options) {
@@ -278,7 +280,7 @@ export class AnalyticsService {
             query += ` LIMIT ?`;
             params.push(options.limit);
         }
-        const results = this.db.prepare(query).all(...params);
+        const results = this.db.query(query, params);
         return results.map(r => ({
             id: r.id,
             userId: r.user_id,
@@ -292,35 +294,27 @@ export class AnalyticsService {
         }));
     }
     markAsRead(notificationId, userId) {
-        const result = this.db.prepare(`
-      UPDATE notifications
+        const result = this.db.run(`UPDATE notifications
       SET read = 1, read_at = datetime('now')
-      WHERE id = ? AND user_id = ?
-    `).run(notificationId, userId);
+      WHERE id = ? AND user_id = ?`, [notificationId, userId]);
         return result.changes > 0;
     }
     markAllAsRead(userId) {
-        const result = this.db.prepare(`
-      UPDATE notifications
+        const result = this.db.run(`UPDATE notifications
       SET read = 1, read_at = datetime('now')
-      WHERE user_id = ? AND read = 0
-    `).run(userId);
+      WHERE user_id = ? AND read = 0`, [userId]);
         return result.changes;
     }
     deleteNotification(notificationId, userId) {
-        const result = this.db.prepare(`
-      DELETE FROM notifications
-      WHERE id = ? AND user_id = ?
-    `).run(notificationId, userId);
+        const result = this.db.run(`DELETE FROM notifications
+      WHERE id = ? AND user_id = ?`, [notificationId, userId]);
         return result.changes > 0;
     }
     getUnreadCount(userId) {
-        const result = this.db.prepare(`
-      SELECT COUNT(*) as count
+        const result = this.db.querySingle(`SELECT COUNT(*) as count
       FROM notifications
-      WHERE user_id = ? AND read = 0
-    `).get(userId);
-        return result.count || 0;
+      WHERE user_id = ? AND read = 0`, [userId]);
+        return result?.count || 0;
     }
     // --------------------------------------------------------------------------
     // Batch Job Analytics

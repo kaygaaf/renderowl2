@@ -67,7 +67,7 @@ export class PerformanceMonitor extends EventEmitter {
 
   // Record the start of a request
   recordRequestStart(requestId: string): void {
-    this.requestStartTimes.set(requestId, Date.now());
+    this.requestStartTimes.set(requestId, performance.now());
   }
 
   // Record request completion
@@ -88,7 +88,7 @@ export class PerformanceMonitor extends EventEmitter {
 
     if (!startTime) return;
 
-    const responseTimeMs = Date.now() - startTime;
+    const responseTimeMs = Math.round(performance.now() - startTime);
 
     const metric: PerformanceMetric = {
       timestamp: Date.now(),
@@ -276,6 +276,11 @@ export class PerformanceMonitor extends EventEmitter {
     this.startTime = Date.now();
   }
 
+  // Get monitor uptime in milliseconds
+  getUptime(): number {
+    return Date.now() - this.startTime;
+  }
+
   // Stop the monitor
   stop(): void {
     if (this.cleanupInterval) {
@@ -309,7 +314,7 @@ export async function performancePlugin(
     
     monitor.recordRequestEnd(
       request.id as string,
-      request.routerPath || request.url,
+      (request as any).routerPath || request.url,
       request.method,
       reply.statusCode,
       {

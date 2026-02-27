@@ -11,6 +11,9 @@ import monitoringPlugin, { StructuredLogger } from './lib/monitoring.js';
 import securityPlugin from './lib/security.js';
 import { EnhancedJobQueue } from './lib/enhanced-queue.js';
 import { AutomationRunner } from './lib/automation-runner.js';
+import { rateLimitPlugin } from './lib/ratelimit/index.js';
+import { performancePlugin } from './lib/performance.js';
+import { apiVersioningPlugin } from './lib/api-versioning.js';
 // Import routes
 import projectsRoutes from './routes/projects.js';
 import assetsRoutes from './routes/assets.js';
@@ -132,12 +135,48 @@ await fastify.register(cachePlugin, {
         maxSizeBytes: 100 * 1024 * 1024,
     },
 });
-// 5. Helmet for additional security headers
-await fastify.register(helmet, {
-    contentSecurityPolicy: false, // We handle this in security plugin
-    crossOriginEmbedderPolicy: false,
+// 5. Rate Limiting Plugin
+await fastify.register(rateLimitPlugin, {
+    dbPath: path.join(__dirname, '../data/ratelimit.db'),
+    keyGenerator: (request) => {
+        const userId = request.user?.id;
+        if (userId)
+            return `user:${userId}`;
+        const apiKey = request.headers['x-api-key'];
+        if (apiKey)
+            return `apikey:${apiKey.slice(0, 8)}`;
+        return `ip:${request.ip || request.socket.remoteAddress || 'unknown'}`;
+    },
+    tierResolver: (request) => request.user?.tier || 'free',
 });
-// 6. CORS
+// 6. Performance Monitoring Plugin
+await fastify.register(performancePlugin, {
+    maxMetrics: 50000,
+    retentionMs: 24 * 60 * 60 * 1000, // 24 hours
+});
+// 7. Helmet for additional security headers
+await fastify.register(helmet, {
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'none'"],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+    },
+});
+// 8. CORS
 await fastify.register(cors, {
     origin: (origin, cb) => {
         const allowed = process.env.CORS_ORIGIN?.split(',') || [
@@ -176,11 +215,13 @@ await fastify.register(cors, {
         'ETag',
     ],
 });
-// 7. JWT
+// 9. JWT
 await fastify.register(jwt, {
     secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
     decode: { complete: true },
 });
+// 10. API Versioning Plugin
+await fastify.register(apiVersioningPlugin);
 // ============================================================================
 // Decorate Fastify Instance
 // ============================================================================

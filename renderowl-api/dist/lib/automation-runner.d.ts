@@ -53,6 +53,9 @@ export interface AutomationJobPayload {
 export declare class AutomationRunner {
     private queue;
     private executionStore;
+    private cleanupInterval;
+    private readonly MAX_EXECUTIONS;
+    private readonly TTL_MS;
     constructor(queue: JobQueue | EnhancedJobQueue);
     private registerHandlers;
     triggerAutomation(automation: Automation, triggerData: Record<string, unknown>, options?: JobOptions): Promise<{
@@ -73,6 +76,8 @@ export declare class AutomationRunner {
     getExecution(executionId: string): AutomationExecution | undefined;
     getExecutionsByAutomation(automationId: string): AutomationExecution[];
     getRecentExecutions(limit?: number): AutomationExecution[];
+    private startCleanupInterval;
+    private cleanupOldExecutions;
+    stopCleanup(): void;
 }
-export default AutomationRunner;
 //# sourceMappingURL=automation-runner.d.ts.map
