@@ -180,20 +180,50 @@ export function addCredits(userId: string, amount: number, description: string, 
   return true;
 }
 
-export function deductCredits(userId: string, amount: number, description: string, metadata?: any): { success: boolean; error?: string } {
-  const user = usersStore.get(userId);
-  if (!user) return { success: false, error: 'User not found' };
+// Simple in-memory lock for credit operations per user
+const creditLocks = new Map<string, boolean>();
 
-  if (user.credits_balance < amount) {
-    return { success: false, error: 'Insufficient credits' };
+function acquireLock(userId: string): boolean {
+  if (creditLocks.get(userId)) return false;
+  creditLocks.set(userId, true);
+  return true;
+}
+
+function releaseLock(userId: string): void {
+  creditLocks.delete(userId);
+}
+
+export function deductCredits(
+  userId: string, 
+  amount: number, 
+  description: string, 
+  metadata?: any
+): { success: boolean; error?: string } {
+  // Acquire lock for atomic operation
+  if (!acquireLock(userId)) {
+    return { success: false, error: 'Credit operation in progress, please retry' };
   }
 
-  const newBalance = user.credits_balance - amount;
-  user.credits_balance = newBalance;
-  user.updated_at = now();
+  try {
+    const user = usersStore.get(userId);
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
 
-  addCreditTransaction(userId, 'usage', -amount, description, metadata);
-  return { success: true };
+    // Double-check balance inside lock
+    if (user.credits_balance < amount) {
+      return { success: false, error: 'Insufficient credits' };
+    }
+
+    const newBalance = user.credits_balance - amount;
+    user.credits_balance = newBalance;
+    user.updated_at = now();
+
+    addCreditTransaction(userId, 'usage', -amount, description, metadata);
+    return { success: true };
+  } finally {
+    releaseLock(userId);
+  }
 }
 
 export function addCreditTransaction(

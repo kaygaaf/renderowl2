@@ -381,8 +381,36 @@ export async function rateLimitPlugin(
 
   // Add hook to check rate limits on every request
   fastify.addHook('onRequest', async (request, reply) => {
-    // Skip rate limiting for health checks
-    if (request.url === '/health' || request.url === '/live') {
+    // Apply stricter rate limiting for public endpoints
+    const isPublicEndpoint = request.url === '/health' || 
+                             request.url === '/live' || 
+                             request.url.startsWith('/docs');
+    
+    if (isPublicEndpoint) {
+      // Use IP-based rate limiting for public endpoints
+      const ip = request.ip || request.socket.remoteAddress || 'unknown';
+      const result = limiter.checkLimit(`public:${ip}`, 'free', 'anonymous');
+      
+      // Add rate limit headers
+      const headers = limiter.getHeaders(result);
+      for (const [name, value] of Object.entries(headers)) {
+        reply.header(name, value);
+      }
+      
+      // If limit exceeded, return 429
+      if (!result.allowed) {
+        reply.status(429).send({
+          type: 'https://api.renderowl.com/errors/rate-limit-exceeded',
+          title: 'Rate Limit Exceeded',
+          status: 429,
+          detail: `Public endpoint rate limit exceeded. Retry after ${result.retryAfter} seconds.`,
+          instance: request.url,
+          retry_after: result.retryAfter,
+        });
+        return;
+      }
+      
+      // Public endpoint rate limit passed, continue
       return;
     }
 

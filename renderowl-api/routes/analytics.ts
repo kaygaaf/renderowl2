@@ -269,6 +269,9 @@ export class AnalyticsService {
   }
 
   getDailyStats(userId: string, days: number = 30): DailyStats[] {
+    // Clamp days to reasonable range to prevent abuse
+    const clampedDays = Math.min(Math.max(days, 1), 365);
+    
     const results = this.db.prepare(`
       SELECT 
         date,
@@ -282,9 +285,9 @@ export class AnalyticsService {
         storage_bytes_used
       FROM analytics_daily
       WHERE user_id = ?
-        AND date >= date('now', '-${days} days')
+        AND date >= date('now', ?)
       ORDER BY date DESC
-    `).all(userId) as any[];
+    `).all(userId, `-${clampedDays} days`) as any[];
 
     return results.map(r => ({
       date: r.date,
@@ -305,6 +308,10 @@ export class AnalyticsService {
     days: number = 30,
     projectId?: string
   ): TimeSeriesPoint[] {
+    // Clamp days to reasonable range
+    const clampedDays = Math.min(Math.max(days, 1), 365);
+    const daysParam = `-${clampedDays} days`;
+    
     const metricColumn = {
       renders: 'renders_total',
       credits: 'credits_used',
@@ -321,12 +328,12 @@ export class AnalyticsService {
         FROM renders
         WHERE user_id = ?
           AND project_id = ?
-          AND created_at >= date('now', '-${days} days')
+          AND created_at >= date('now', ?)
         GROUP BY date(created_at)
         ORDER BY date
       `;
       
-      const results = this.db.prepare(query).all(userId, projectId) as any[];
+      const results = this.db.prepare(query).all(userId, projectId, daysParam) as any[];
       return results.map(r => ({
         timestamp: r.date,
         value: r.value,
@@ -338,9 +345,9 @@ export class AnalyticsService {
       SELECT date, ${metricColumn} as value
       FROM analytics_daily
       WHERE user_id = ?
-        AND date >= date('now', '-${days} days')
+        AND date >= date('now', ?)
       ORDER BY date
-    `).all(userId) as any[];
+    `).all(userId, daysParam) as any[];
 
     return results.map(r => ({
       timestamp: r.date,

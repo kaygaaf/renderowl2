@@ -69,13 +69,22 @@ export interface AutomationJobPayload {
 // Automation Runner
 // ============================================================================
 
+interface ExecutionEntry {
+  execution: AutomationExecution;
+  completedAt: number; // timestamp for TTL cleanup
+}
+
 export class AutomationRunner {
   private queue: JobQueue | EnhancedJobQueue;
-  private executionStore = new Map<string, AutomationExecution>();
+  private executionStore = new Map<string, ExecutionEntry>();
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  private readonly MAX_EXECUTIONS = 10000; // Maximum executions to store
+  private readonly TTL_MS = 24 * 60 * 60 * 1000; // 24 hour TTL
 
   constructor(queue: JobQueue | EnhancedJobQueue) {
     this.queue = queue;
     this.registerHandlers();
+    this.startCleanupInterval();
   }
 
   private registerHandlers(): void {
@@ -122,7 +131,7 @@ export class AutomationRunner {
       startedAt: new Date().toISOString(),
     };
 
-    this.executionStore.set(executionId, execution);
+    this.executionStore.set(executionId, { execution, completedAt: Date.now() });
 
     // Create job with idempotency key if automation has unique constraints
     const idempotencyKey = options.idempotencyKey || `${automation.id}:${Date.now()}`;
@@ -152,11 +161,12 @@ export class AutomationRunner {
     automationData: any,
     triggerData: Record<string, unknown>
   ): Promise<void> {
-    const execution = this.executionStore.get(executionId);
-    if (!execution) {
+    const entry = this.executionStore.get(executionId);
+    if (!entry) {
       throw new Error(`Execution not found: ${executionId}`);
     }
 
+    const execution = entry.execution;
     const automation = this.deserializeAutomation(automationData);
 
     try {
@@ -190,6 +200,7 @@ export class AutomationRunner {
           execution.status = 'failed';
           execution.error = error.message;
           execution.completedAt = new Date().toISOString();
+          entry.completedAt = Date.now(); // Update cleanup timestamp
           throw error;
         }
 
@@ -198,10 +209,12 @@ export class AutomationRunner {
 
       execution.status = 'completed';
       execution.completedAt = new Date().toISOString();
+      entry.completedAt = Date.now(); // Update cleanup timestamp
     } catch (error: any) {
       execution.status = 'failed';
       execution.error = error.message;
       execution.completedAt = new Date().toISOString();
+      entry.completedAt = Date.now(); // Update cleanup timestamp
       throw error;
     }
   }
@@ -420,20 +433,68 @@ export class AutomationRunner {
   // ========================================================================
 
   getExecution(executionId: string): AutomationExecution | undefined {
-    return this.executionStore.get(executionId);
+    const entry = this.executionStore.get(executionId);
+    return entry?.execution;
   }
 
   getExecutionsByAutomation(automationId: string): AutomationExecution[] {
     return Array.from(this.executionStore.values())
-      .filter(e => e.automationId === automationId)
+      .filter(e => e.execution.automationId === automationId)
+      .map(e => e.execution)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
   }
 
   getRecentExecutions(limit = 50): AutomationExecution[] {
     return Array.from(this.executionStore.values())
+      .map(e => e.execution)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
       .slice(0, limit);
   }
-}
 
-export default AutomationRunner;
+  // ========================================================================
+  // Cleanup
+  // ========================================================================
+
+  private startCleanupInterval(): void {
+    // Run cleanup every hour
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupOldExecutions();
+    }, 60 * 60 * 1000);
+  }
+
+  private cleanupOldExecutions(): void {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [id, entry] of this.executionStore) {
+      // Remove entries older than TTL
+      if (now - entry.completedAt > this.TTL_MS) {
+        this.executionStore.delete(id);
+        cleaned++;
+      }
+    }
+
+    // If still over max, remove oldest
+    if (this.executionStore.size > this.MAX_EXECUTIONS) {
+      const sorted = Array.from(this.executionStore.entries())
+        .sort((a, b) => a[1].completedAt - b[1].completedAt);
+      
+      const toRemove = sorted.slice(0, this.executionStore.size - this.MAX_EXECUTIONS);
+      for (const [id] of toRemove) {
+        this.executionStore.delete(id);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`[AutomationRunner] Cleaned up ${cleaned} old executions`);
+    }
+  }
+
+  stopCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+  }
+}

@@ -285,17 +285,39 @@ export class WebhookService extends EventEmitter {
     `).all() as any[];
 
     for (const row of pending) {
-      // Remove from queue
-      this.db.prepare('DELETE FROM webhook_event_queue WHERE id = ?').run(row.id);
-      
-      // Process delivery
-      await this.executeDelivery(row.id, {
-        url: row.url,
-        secret: row.secret,
-        headers: row.headers ? JSON.parse(row.headers) : {},
-        payload: JSON.parse(row.payload),
-        maxRetries: row.max_retries,
-      });
+      try {
+        // Remove from queue
+        this.db.prepare('DELETE FROM webhook_event_queue WHERE id = ?').run(row.id);
+        
+        // Process delivery
+        await this.executeDelivery(row.id, {
+          url: row.url,
+          secret: row.secret,
+          headers: row.headers ? JSON.parse(row.headers) : {},
+          payload: JSON.parse(row.payload),
+          maxRetries: row.max_retries,
+        });
+      } catch (error: any) {
+        // Log error but continue processing other deliveries
+        console.error(`[WebhookService] Failed to process delivery ${row.id}:`, error.message);
+        
+        // Try to mark as failed if we haven't already
+        try {
+          const payload = JSON.parse(row.payload);
+          this.handleDeliveryFailure(
+            row.id,
+            payload,
+            row.max_retries || 5,
+            `Processing error: ${error.message}`,
+            null,
+            null,
+            0
+          );
+        } catch (innerError) {
+          // If we can't even mark it as failed, just log it
+          console.error(`[WebhookService] Could not mark delivery as failed:`, innerError);
+        }
+      }
     }
   }
 
