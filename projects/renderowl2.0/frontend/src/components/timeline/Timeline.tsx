@@ -23,7 +23,9 @@ export interface TimelineProps {
 
 export const Timeline: React.FC<TimelineProps> = ({ className = '' }) => {
   const tracks = useTracks();
-  const { moveTrack, moveClip, setCurrentTime } = useTimelineStore();
+  const moveTrack = useTimelineStore((state) => state.moveTrack);
+  const moveClip = useTimelineStore((state) => state.moveClip);
+  const setCurrentTime = useTimelineStore((state) => state.setCurrentTime);
   const [activeId, setActiveId] = React.useState<string | null>(null);
 
   const handleDragStart = (event: DragStartEvent) => {
