@@ -1,0 +1,327 @@
+# ServiceMonitor Resources for Prometheus Operator
+# Renderowl 2.0 - Staging Environment
+#
+# Prerequisites:
+#   - Prometheus Operator installed in cluster
+#   - ServiceMonitor CRD available
+#   - Prometheus resource with serviceMonitorSelector matching these labels
+
+---
+# ServiceMonitor for Renderowl Backend (Go/Gin)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: renderowl-backend
+  namespace: monitoring
+  labels:
+    app: renderowl-backend
+    environment: staging
+    prometheus: renderowl
+spec:
+  namespaceSelector:
+    matchNames:
+      - staging
+  selector:
+    matchLabels:
+      app: renderowl-backend
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 10s
+      scrapeTimeout: 5s
+      honorLabels: true
+      # Basic auth if enabled on backend
+      # basicAuth:
+      #   username:
+      #     name: prometheus-auth
+      #     key: username
+      #   password:
+      #     name: prometheus-auth
+      #     key: password
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'go_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'promhttp_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'renderowl_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'gin_.*'
+          action: keep
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+
+---
+# ServiceMonitor for Renderowl Frontend (Next.js)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: renderowl-frontend
+  namespace: monitoring
+  labels:
+    app: renderowl-frontend
+    environment: staging
+    prometheus: renderowl
+spec:
+  namespaceSelector:
+    matchNames:
+      - staging
+  selector:
+    matchLabels:
+      app: renderowl-frontend
+  endpoints:
+    - port: metrics
+      path: /api/metrics
+      interval: 15s
+      scrapeTimeout: 5s
+      honorLabels: true
+
+---
+# ServiceMonitor for Node Exporter
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels:
+    app: node-exporter
+    environment: staging
+    prometheus: renderowl
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring
+      - kube-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: node-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: instance
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+
+---
+# ServiceMonitor for PostgreSQL Exporter
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres-exporter
+  namespace: monitoring
+  labels:
+    app: postgres-exporter
+    environment: staging
+    prometheus: renderowl
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 5s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'pg_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'pg_exporter_.*'
+          action: keep
+
+---
+# ServiceMonitor for Redis Exporter
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  labels:
+    app: redis-exporter
+    environment: staging
+    prometheus: renderowl
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      app: redis-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 5s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'redis_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'redis_exporter_.*'
+          action: keep
+
+---
+# PrometheusRule - Example Alerting Rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: renderowl-alerts
+  namespace: monitoring
+  labels:
+    app: renderowl
+    environment: staging
+    prometheus: renderowl
+spec:
+  groups:
+    - name: renderowl-backend
+      rules:
+        - alert: RenderowlBackendDown
+          expr: up{job="renderowl-backend"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Renderowl Backend is down"
+            description: "Renderowl Backend has been down for more than 1 minute"
+
+        - alert: RenderowlBackendHighErrorRate
+          expr: rate(renderowl_http_requests_total{status=~"5.."}[5m]) / rate(renderowl_http_requests_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High error rate on Renderowl Backend"
+            description: "Error rate is above 10% for more than 2 minutes"
+
+        - alert: RenderowlBackendSlowRequests
+          expr: histogram_quantile(0.95, rate(renderowl_http_request_duration_seconds_bucket[5m])) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Slow requests on Renderowl Backend"
+            description: "95th percentile latency is above 500ms"
+
+    - name: infrastructure
+      rules:
+        - alert: HighCPUUsage
+          expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage on {{ $labels.instance }}"
+            description: "CPU usage is above 80% for more than 5 minutes"
+
+        - alert: HighMemoryUsage
+          expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage on {{ $labels.instance }}"
+            description: "Memory usage is above 85% for more than 5 minutes"
+
+        - alert: DiskSpaceLow
+          expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Low disk space on {{ $labels.instance }}"
+            description: "Disk usage is above 80%"
+
+    - name: postgres
+      rules:
+        - alert: PostgreSQLDown
+          expr: pg_up == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL is down"
+            description: "PostgreSQL exporter cannot reach the database"
+
+        - alert: PostgreSQLConnectionsHigh
+          expr: pg_stat_activity_count / pg_settings_max_connections * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High PostgreSQL connection usage"
+            description: "PostgreSQL connections are above 80%"
+
+    - name: redis
+      rules:
+        - alert: RedisDown
+          expr: redis_up == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Redis is down"
+            description: "Redis exporter cannot reach Redis"
+
+        - alert: RedisMemoryHigh
+          expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High Redis memory usage"
+            description: "Redis memory usage is above 80%"
+
+---
+# Example Prometheus Resource (if using Prometheus Operator)
+# Uncomment and adjust as needed for your cluster
+# apiVersion: monitoring.coreos.com/v1
+# kind: Prometheus
+# metadata:
+#   name: renderowl
+#   namespace: monitoring
+# spec:
+#   replicas: 1
+#   serviceAccountName: prometheus
+#   serviceMonitorSelector:
+#     matchLabels:
+#       prometheus: renderowl
+#   podMonitorSelector:
+#     matchLabels:
+#       prometheus: renderowl
+#   retention: 15d
+#   retentionSize: "10GB"
+#   resources:
+#     requests:
+#       memory: 512Mi
+#       cpu: 250m
+#     limits:
+#       memory: 2Gi
+#       cpu: "1"
+#   storage:
+#     volumeClaimTemplate:
+#       spec:
+#         resources:
+#           requests:
+#             storage: 20Gi
+#   enableAdminAPI: false
+#   web:
+#     pageTitle: "Renderowl Prometheus"

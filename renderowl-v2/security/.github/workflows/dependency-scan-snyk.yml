@@ -1,0 +1,150 @@
+name: Dependency Scan - Snyk
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/yarn.lock'
+      - '**/pnpm-lock.yaml'
+      - '**/requirements.txt'
+      - '**/Pipfile'
+      - '**/poetry.lock'
+      - '**/Cargo.toml'
+      - '**/go.mod'
+      - '**/Dockerfile'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/yarn.lock'
+      - '**/pnpm-lock.yaml'
+      - '**/requirements.txt'
+      - '**/Pipfile'
+      - '**/poetry.lock'
+      - '**/Cargo.toml'
+      - '**/go.mod'
+      - '**/Dockerfile'
+  schedule:
+    # Run daily at 3:00 AM UTC
+    - cron: '0 3 * * *'
+
+jobs:
+  snyk-scan:
+    name: Snyk Dependency Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (if needed)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+        if: hashFiles('**/package.json') != ''
+
+      - name: Setup Python (if needed)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+        if: hashFiles('**/requirements.txt') != ''
+
+      - name: Install dependencies
+        run: |
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          elif [ -f "yarn.lock" ]; then
+            yarn install --frozen-lockfile
+          elif [ -f "pnpm-lock.yaml" ]; then
+            pnpm install --frozen-lockfile
+          fi
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk-results.sarif
+
+      - name: Run Snyk for Python (if applicable)
+        uses: snyk/actions/python@master
+        continue-on-error: true
+        if: hashFiles('**/requirements.txt') != '' || hashFiles('**/Pipfile') != ''
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk-python-results.sarif
+
+      - name: Upload SARIF to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk-results.sarif
+          category: snyk
+
+      - name: Upload Python SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('snyk-python-results.sarif') != ''
+        with:
+          sarif_file: snyk-python-results.sarif
+          category: snyk-python
+
+      - name: Monitor project in Snyk dashboard
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: monitor
+        if: github.ref == 'refs/heads/main'
+
+      - name: Generate dependency report
+        run: |
+          echo "# Dependency Security Report" > dependency-report.md
+          echo "Generated: $(date -u)" >> dependency-report.md
+          echo "" >> dependency-report.md
+          echo "## SLAs" >> dependency-report.md
+          echo "- Critical vulnerabilities: Must be fixed within 24 hours" >> dependency-report.md
+          echo "- High vulnerabilities: Must be fixed within 7 days" >> dependency-report.md
+          echo "" >> dependency-report.md
+          echo "## Results" >> dependency-report.md
+          echo "See GitHub Security tab for detailed findings." >> dependency-report.md
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-report
+          path: dependency-report.md
+
+  # Alternative: Use Dependabot alerts (native GitHub feature)
+  # This job documents the Dependabot configuration
+  dependabot-info:
+    name: Dependabot Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check Dependabot config
+        run: |
+          if [ ! -f ".github/dependabot.yml" ]; then
+            echo "⚠️ Consider adding .github/dependabot.yml for automated dependency updates"
+            echo "Example configuration:"
+            cat << 'EOF'
+          version: 2
+          updates:
+            - package-ecosystem: "npm"
+              directory: "/"
+              schedule:
+                interval: "daily"
+              open-pull-requests-limit: 10
+              labels:
+                - "dependencies"
+                - "security"
+          EOF
+          fi

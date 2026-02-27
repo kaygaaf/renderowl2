@@ -1,0 +1,60 @@
+# ============================================================================
+# Renderowl 2.0 - Backup Cron Schedule
+# ============================================================================
+# Format: minute hour day-of-month month day-of-week command
+# All times are in UTC - adjust for your timezone
+# ============================================================================
+
+# Shell environment
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOME=/backup
+
+# Load environment variables
+BASH_ENV=/tmp/env.sh
+
+# ============================================================================
+# Database Backups
+# ============================================================================
+
+# Daily full backup at 2:00 AM UTC (off-peak hours)
+0 2 * * * /backup/scripts/pg-backup.sh daily >> /var/log/renderowl/cron-daily.log 2>&1
+
+# Weekly full backup on Sundays at 1:00 AM UTC
+0 1 * * 0 /backup/scripts/pg-backup.sh weekly >> /var/log/renderowl/cron-weekly.log 2>&1
+
+# Monthly full backup on the 1st at 12:00 AM UTC
+0 0 1 * * /backup/scripts/pg-backup.sh monthly >> /var/log/renderowl/cron-monthly.log 2>&1
+
+# Cleanup expired backups daily at 3:00 AM UTC
+0 3 * * * /backup/scripts/pg-backup.sh cleanup >> /var/log/renderowl/cron-cleanup.log 2>&1
+
+# Verify latest backup daily at 4:00 AM UTC
+0 4 * * * /backup/scripts/pg-backup.sh verify >> /var/log/renderowl/cron-verify.log 2>&1
+
+# ============================================================================
+# File/Asset Backups (using Restic)
+# ============================================================================
+
+# Hourly file backup (incremental)
+0 * * * * restic backup /data/uploads /data/assets --tag hourly >> /var/log/renderowl/cron-files.log 2>&1
+
+# Daily file backup with full snapshot cleanup
+0 5 * * * restic forget --keep-hourly 24 --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> /var/log/renderowl/cron-restic-cleanup.log 2>&1
+
+# ============================================================================
+# Restore Testing
+# ============================================================================
+
+# Weekly restore test on Saturdays at 6:00 AM UTC
+0 6 * * 6 /backup/scripts/weekly-restore-test.sh >> /var/log/renderowl/cron-restore-test.log 2>&1
+
+# ============================================================================
+# Health Checks and Monitoring
+# ============================================================================
+
+# Update backup health metric every 5 minutes
+*/5 * * * * /backup/scripts/health-check.sh >> /var/log/renderowl/cron-health.log 2>&1
+
+# Send daily backup status report at 8:00 AM UTC
+0 8 * * * /backup/scripts/daily-report.sh >> /var/log/renderowl/cron-report.log 2>&1

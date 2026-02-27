@@ -1,0 +1,82 @@
+name: SAST - Semgrep
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  semgrep:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: returntocorp/semgrep:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep
+        run: |
+          semgrep ci \
+            --config=auto \
+            --config=p/security-audit \
+            --config=p/owasp-top-ten \
+            --config=p/cwe-top-25 \
+            --json --output=semgrep-results.json \
+            --sarif --output=semgrep-results.sarif
+        env:
+          SEMGREP_RULES: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/cwe-top-25
+            p/ci
+            p/secrets
+            p/javascript
+            p/typescript
+            p/python
+            p/docker
+
+      - name: Upload SARIF to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-results
+          path: |
+            semgrep-results.json
+            semgrep-results.sarif
+          retention-days: 30
+
+      - name: Fail on Critical/High findings
+        run: |
+          echo "Checking for critical/high severity findings..."
+          CRITICAL=$(cat semgrep-results.json | jq '[.results[] | select(.extra.severity == "CRITICAL")] | length')
+          HIGH=$(cat semgrep-results.json | jq '[.results[] | select(.extra.severity == "HIGH")] | length')
+          
+          echo "Critical findings: $CRITICAL"
+          echo "High findings: $HIGH"
+          
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ Critical vulnerabilities found! Fix required within 24 hours."
+            exit 1
+          fi
+          
+          if [ "$HIGH" -gt 0 ]; then
+            echo "⚠️ High severity vulnerabilities found! Fix required within 7 days."
+            # Don't fail for high in CI, just warn
+          fi

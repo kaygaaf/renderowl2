@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-backup-scripts
+  namespace: renderowl
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    BACKUP_DIR="${BACKUP_DIR:-/backups}"
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    DATE_PATH=$(date +%Y/%m/%d)
+    S3_PREFIX="${S3_PREFIX:-postgres/${ENVIRONMENT}}"
+    
+    log() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    }
+    
+    error_exit() {
+        log "ERROR: $1"
+        exit 1
+    }
+    
+    full_backup() {
+        log "Starting full backup for database: $DB_NAME"
+        
+        local backup_file="${BACKUP_DIR}/full_${DB_NAME}_${TIMESTAMP}.sql"
+        local compressed_file="${backup_file}.zst"
+        local encrypted_file="${compressed_file}.age"
+        
+        mkdir -p "$BACKUP_DIR"
+        
+        # Perform pg_dump
+        log "Running pg_dump..."
+        PGPASSWORD="${DB_PASSWORD}" pg_dump \
+            -h "$DB_HOST" \
+            -p "$DB_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME" \
+            --format=custom \
+            --verbose \
+            --file="$backup_file" || error_exit "pg_dump failed"
+        
+        # Compress
+        log "Compressing backup..."
+        zstd -3 --rm "$backup_file" -o "$compressed_file" || error_exit "Compression failed"
+        
+        # Encrypt
+        log "Encrypting backup..."
+        if [ -n "$AGE_PUBLIC_KEY" ]; then
+            age -r "$AGE_PUBLIC_KEY" -o "$encrypted_file" "$compressed_file" || error_exit "Encryption failed"
+            rm -f "$compressed_file"
+        else
+            encrypted_file="$compressed_file"
+        fi
+        
+        # Upload to S3
+        local s3_key="${S3_PREFIX}/full/${DATE_PATH}/${DB_NAME}_${TIMESTAMP}.sql.zst"
+        [ -f "$encrypted_file" ] && s3_key="${s3_key}.age"
+        
+        log "Uploading to S3: $s3_key"
+        aws s3 cp "$encrypted_file" "s3://${S3_BUCKET}/${s3_key}" \
+            --endpoint-url="$S3_ENDPOINT" \
+            --storage-class STANDARD || error_exit "S3 upload failed"
+        
+        local file_size=$(du -h "$encrypted_file" | cut -f1)
+        rm -f "$encrypted_file"
+        
+        log "Full backup completed: $s3_key (size: $file_size)"
+    }
+    
+    case "${1:-full}" in
+        full)
+            full_backup
+            ;;
+        *)
+            echo "Usage: $0 {full}"
+            exit 1
+            ;;
+    esac
+
+  retention.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    S3_PREFIX="${S3_PREFIX:-postgres/${ENVIRONMENT}}"
+    DAILY_RETENTION_DAYS=7
+    WEEKLY_RETENTION_DAYS=28
+    MONTHLY_RETENTION_DAYS=365
+    
+    log() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    }
+    
+    get_backups() {
+        aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/full/" \
+            --endpoint-url="$S3_ENDPOINT" \
+            --recursive 2>/dev/null | grep "\.sql" || true
+    }
+    
+    parse_backup_date() {
+        local path="$1"
+        local date_str=$(echo "$path" | grep -oE '[0-9]{4}/[0-9]{2}/[0-9]{2}' | tr '/' '-')
+        if [ -n "$date_str" ]; then
+            date -d "$date_str" +%s 2>/dev/null || echo "0"
+        else
+            echo "0"
+        fi
+    }
+    
+    should_keep() {
+        local backup_date="$1"
+        local current_date="$2"
+        local age_days=$(( (current_date - backup_date) / 86400 ))
+        
+        [ $age_days -lt $DAILY_RETENTION_DAYS ] && return 0
+        
+        if [ $age_days -lt $WEEKLY_RETENTION_DAYS ]; then
+            local weekday=$(date -d "@$backup_date" +%u)
+            [ "$weekday" == "7" ] && return 0
+        fi
+        
+        if [ $age_days -lt $MONTHLY_RETENTION_DAYS ]; then
+            local day_of_month=$(date -d "@$backup_date" +%d)
+            [ "$day_of_month" == "01" ] && return 0
+        fi
+        
+        return 1
+    }
+    
+    apply_retention() {
+        log "Applying retention policy"
+        
+        local current_date=$(date +%s)
+        local deleted_count=0
+        local kept_count=0
+        
+        local backups=$(get_backups)
+        [ -z "$backups" ] && { log "No backups found"; return 0; }
+        
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            
+            local file_path=$(echo "$line" | awk '{$1=$2=$3=""; print $0}' | sed 's/^[[:space:]]*//')
+            local backup_date=$(parse_backup_date "$file_path")
+            
+            [ "$backup_date" == "0" ] && continue
+            
+            if should_keep "$backup_date" "$current_date"; then
+                log "KEEP: $file_path"
+                ((kept_count++))
+            else
+                log "DELETE: $file_path"
+                aws s3 rm "s3://${S3_BUCKET}/${file_path}" --endpoint-url="$S3_ENDPOINT" && ((deleted_count++))
+            fi
+        done <<< "$backups"
+        
+        log "Retention applied: $deleted_count deleted, $kept_count kept"
+    }
+    
+    cleanup_wal() {
+        log "Cleaning up old WAL files"
+        local cutoff_date=$(date -d '30 days ago' +%Y/%m/%d)
+        local wal_prefix="${S3_PREFIX}/wal"
+        
+        local old_dirs=$(aws s3 ls "s3://${S3_BUCKET}/${wal_prefix}/" \
+            --endpoint-url="$S3_ENDPOINT" 2>/dev/null | awk '{print $2}' | sed 's|/$||' || true)
+        
+        local deleted=0
+        while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            if [[ "$dir" < "$cutoff_date" ]]; then
+                log "DELETE WAL: $dir"
+                aws s3 rm "s3://${S3_BUCKET}/${wal_prefix}/${dir}/" --endpoint-url="$S3_ENDPOINT" --recursive && ((deleted++))
+            fi
+        done <<< "$old_dirs"
+        
+        log "WAL cleanup: $deleted directories removed"
+    }
+    
+    case "${1:-all}" in
+        backups) apply_retention ;;
+        wal) cleanup_wal ;;
+        all) apply_retention; cleanup_wal ;;
+    esac

@@ -1,0 +1,38 @@
+# GitLeaks Configuration
+# Custom configuration for secrets detection
+
+title = "Renderowl GitLeaks Config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "custom-api-key"
+description = "Custom API Key Pattern"
+regex = '''(?i)(api[_-]?key\s*=\s*['"])([a-zA-Z0-9_\-]{32,})(['"])'''
+tags = ["api", "key"]
+keywords = ["api", "key"]
+
+[[rules]]
+id = "custom-jwt-token"
+description = "JWT Token Pattern"
+regex = '''eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*'''
+tags = ["jwt", "token"]
+keywords = ["eyJ"]
+
+[allowlist]
+description = "Global Allowlist"
+paths = [
+  '''\.gitleaks\.toml$''',
+  '''(.*?)(png|jpg|gif|svg)$''',
+  '''tests\/''',
+  '''test\/''',
+  '''__tests__\/''',
+  '''\.test\.'''
+]
+regexes = [
+  '''example''',
+  '''sample''',
+  '''dummy''',
+  '''test123'''
+]

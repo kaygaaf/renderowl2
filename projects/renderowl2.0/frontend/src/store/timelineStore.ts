@@ -37,8 +37,11 @@ const initialState: TimelineState = {
   isPlaying: false,
 };
 
+// Combine state and actions type
+type TimelineStore = TimelineState & TimelineActions;
+
 // Create the store
-export const useTimelineStore = create(
+export const useTimelineStore = create<TimelineStore>()(
   devtools(
     (set, get) => ({
       ...initialState,

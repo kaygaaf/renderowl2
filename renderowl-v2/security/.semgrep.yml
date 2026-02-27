@@ -1,0 +1,13 @@
+# Semgrep Configuration
+# Custom rules and configuration for Renderowl
+
+rules:
+  - p/security-audit
+  - p/owasp-top-ten
+  - p/cwe-top-25
+  - p/ci
+  - p/secrets
+  - p/javascript
+  - p/typescript
+  - p/react
+  - p/docker

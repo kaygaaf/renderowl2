@@ -1,0 +1,10 @@
+[Unit]
+Description=Run PostgreSQL Retention Policy daily at 3:00 AM
+
+[Timer]
+OnCalendar=daily
+OnCalendar=03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

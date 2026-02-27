@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-backup-config
+  namespace: renderowl
+data:
+  db-name: "renderowl"
+  environment: "staging"  # Change to 'production' for prod
+  s3-bucket: "renderowl-backups"
+  s3-prefix: "postgres"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-backup-secrets
+  namespace: renderowl
+type: Opaque
+stringData:
+  db-host: "postgres-service.renderowl.svc.cluster.local"
+  db-user: "postgres"
+  db-password: "YOUR_DB_PASSWORD_HERE"
+  s3-endpoint: "https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com"
+  s3-access-key-id: "YOUR_R2_ACCESS_KEY_ID"
+  s3-secret-access-key: "YOUR_R2_SECRET_ACCESS_KEY"
+  age-public-key: "YOUR_AGE_PUBLIC_KEY"

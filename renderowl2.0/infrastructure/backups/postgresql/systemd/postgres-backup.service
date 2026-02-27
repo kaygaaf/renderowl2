@@ -1,0 +1,26 @@
+[Unit]
+Description=PostgreSQL Full Backup for Renderowl
+After=network.target
+
+[Service]
+Type=oneshot
+User=postgres
+Group=postgres
+EnvironmentFile=/etc/backup/backup.env
+ExecStart=/usr/local/bin/backup.sh full
+StandardOutput=append:/var/log/postgresql/backup.log
+StandardError=append:/var/log/postgresql/backup.log
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/postgresql/backups /var/log/postgresql
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

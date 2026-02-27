@@ -1,0 +1,52 @@
+# ============================================================================
+# Renderowl 2.0 - Native Cron Setup
+# ============================================================================
+# For systems not using Docker for backup scheduling
+# Install these entries to /etc/cron.d/renderowl-backups
+# ============================================================================
+
+# Shell environment
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Working directory
+RENDEROWL_BACKUP_DIR=/opt/renderowl/backups
+
+# Load environment
+BASH_ENV=/opt/renderowl/backups/config/backup.env
+
+# ============================================================================
+# Database Backups
+# ============================================================================
+
+# Daily full backup at 2:00 AM UTC
+0 2 * * * root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/pg-backup.sh daily >> /var/log/renderowl/cron-daily.log 2>&1
+
+# Weekly full backup on Sundays at 1:00 AM UTC
+0 1 * * 0 root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/pg-backup.sh weekly >> /var/log/renderowl/cron-weekly.log 2>&1
+
+# Monthly full backup on the 1st at 12:00 AM UTC
+0 0 1 * * root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/pg-backup.sh monthly >> /var/log/renderowl/cron-monthly.log 2>&1
+
+# Cleanup expired backups daily at 3:00 AM UTC
+0 3 * * * root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/pg-backup.sh cleanup >> /var/log/renderowl/cron-cleanup.log 2>&1
+
+# Verify latest backup daily at 4:00 AM UTC
+0 4 * * * root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/pg-backup.sh verify >> /var/log/renderowl/cron-verify.log 2>&1
+
+# ============================================================================
+# Restore Testing
+# ============================================================================
+
+# Weekly restore test on Saturdays at 6:00 AM UTC
+0 6 * * 6 root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/weekly-restore-test.sh >> /var/log/renderowl/cron-restore-test.log 2>&1
+
+# ============================================================================
+# Monitoring
+# ============================================================================
+
+# Update backup health metric every 5 minutes
+*/5 * * * * root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/health-check.sh >> /var/log/renderowl/cron-health.log 2>&1
+
+# Send daily backup status report at 8:00 AM UTC
+0 8 * * * root cd ${RENDEROWL_BACKUP_DIR} && ./scripts/daily-report.sh >> /var/log/renderowl/cron-report.log 2>&1

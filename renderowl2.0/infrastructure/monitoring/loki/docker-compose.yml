@@ -1,0 +1,185 @@
+# Docker Compose Deployment for Loki Stack - Renderowl 2.0
+# Includes: Loki, Promtail, Grafana (optional visualization)
+
+version: '3.8'
+
+services:
+  # ============================================
+  # Loki - Log Aggregation Server
+  # ============================================
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+      - "9096:9096"
+    volumes:
+      - ./loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/loki-config.yml
+    networks:
+      - monitoring
+      - renderowl
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    environment:
+      - TZ=Europe/Amsterdam
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ============================================
+  # Promtail - Log Collector
+  # ============================================
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail-positions:/tmp
+      # Mount application log directories
+      - /projects/renderowl2.0/logs:/var/log/renderowl:ro
+      # Mount nginx logs (adjust path as needed)
+      - /var/log/nginx:/var/log/nginx:ro
+      # Mount postgresql logs (adjust path as needed)
+      - /var/log/postgresql:/var/log/postgresql:ro
+      # Mount redis logs
+      - /var/log/redis:/var/log/redis:ro
+      # Docker socket for container metadata
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/promtail-config.yml
+    networks:
+      - monitoring
+    depends_on:
+      loki:
+        condition: service_healthy
+    environment:
+      - TZ=Europe/Amsterdam
+      - HOSTNAME=${HOSTNAME:-renderowl-staging}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============================================
+  # Grafana - Visualization (Optional but Recommended)
+  # ============================================
+  grafana:
+    image: grafana/grafana:10.3.1
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - TZ=Europe/Amsterdam
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ============================================
+  # MinIO - S3-Compatible Object Storage (for cold storage testing)
+  # ============================================
+  # Uncomment for local S3-compatible cold storage testing
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: minio
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   volumes:
+  #     - minio-data:/data
+  #   environment:
+  #     - MINIO_ROOT_USER=minioadmin
+  #     - MINIO_ROOT_PASSWORD=minioadmin
+  #   command: server /data --console-address ":9001"
+  #   networks:
+  #     - monitoring
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     timeout: 20s
+  #     retries: 3
+
+networks:
+  monitoring:
+    driver: bridge
+    name: renderowl-monitoring
+  renderowl:
+    external: true
+    name: renderowl-network
+
+volumes:
+  loki-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /projects/renderowl2.0/data/loki
+  promtail-positions:
+    driver: local
+  grafana-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /projects/renderowl2.0/data/grafana
+  # minio-data:
+  #   driver: local

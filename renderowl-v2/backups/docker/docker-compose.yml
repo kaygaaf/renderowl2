@@ -1,0 +1,267 @@
+version: '3.8'
+
+# ============================================================================
+# Renderowl 2.0 - Backup Tooling Stack
+# ============================================================================
+# This Docker Compose setup provides:
+# - PostgreSQL with WAL archiving enabled
+# - wal-g for continuous WAL archiving to R2
+# - pgBackRest (optional alternative to wal-g)
+# - Prometheus Node Exporter for backup metrics
+# - Restic for file-level backups
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # PostgreSQL with WAL Archiving
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: renderowl-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-renderowl}
+      # WAL Archiving Configuration
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    command: >
+      postgres
+      -c wal_level=replica
+      -c archive_mode=on
+      -c archive_command='wal-g wal-push %p'
+      -c archive_timeout=600
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c wal_keep_size=1GB
+      -c max_wal_size=4GB
+      -c min_wal_size=1GB
+      -c log_destination=stderr
+      -c logging_collector=on
+      -c log_directory=/var/log/postgresql
+      -c log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+      -c log_rotation_age=1d
+      -c log_rotation_size=100MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgresql-wal.conf:/etc/postgresql/postgresql.conf:ro
+      - ./scripts:/backup/scripts:ro
+      - ./config/backup.env:/backup/.env:ro
+      - backup_logs:/var/log/postgresql
+    ports:
+      - "5432:5432"
+    networks:
+      - backup-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # wal-g - WAL Archiving and Backup Tool
+  # ==========================================================================
+  wal-g:
+    image: ghcr.io/wal-g/wal-g:latest
+    container_name: renderowl-walg
+    environment:
+      # R2 Configuration
+      AWS_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      AWS_ENDPOINT: ${R2_ENDPOINT_PRIMARY}
+      AWS_S3_FORCE_PATH_STYLE: "true"
+      AWS_REGION: auto
+      
+      # wal-g Configuration
+      WALG_S3_PREFIX: s3://${R2_BUCKET_PRIMARY:-renderowl-backups-primary}/wal
+      WALG_COMPRESSION_METHOD: brotli
+      WALG_DELTA_MAX_STEPS: 7
+      WALG_UPLOAD_CONCURRENCY: 4
+      WALG_UPLOAD_DISK_CONCURRENCY: 4
+      WALG_DOWNLOAD_CONCURRENCY: 4
+      WALG_PREFETCH_DIR: /tmp/wal-g-prefetch
+      
+      # PGP Configuration for encryption
+      WALG_PGP_KEY_PATH: /backup/keys/backup-private.key
+      WALG_PGP_KEY_PASSPHRASE: ${GPG_PASSPHRASE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:ro
+      - ./keys:/backup/keys:ro
+      - wal_g_cache:/tmp/wal-g-prefetch
+    networks:
+      - backup-network
+    profiles:
+      - backup
+    command: >
+      sh -c "
+        # Continuous WAL push
+        echo 'wal-g configured for PostgreSQL archiving'
+        sleep infinity
+      "
+
+  # ==========================================================================
+  # pgBackRest - Alternative Backup Tool
+  # ==========================================================================
+  pgbackrest:
+    image: pgbackrest/pgbackrest:latest
+    container_name: renderowl-pgbackrest
+    environment:
+      PGBACKREST_STANZA: renderowl
+      PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_REPO1_TYPE: s3
+      PGBACKREST_REPO1_S3_BUCKET: ${R2_BUCKET_PRIMARY:-renderowl-backups-primary}
+      PGBACKREST_REPO1_S3_ENDPOINT: ${R2_ENDPOINT_PRIMARY}
+      PGBACKREST_REPO1_S3_REGION: auto
+      PGBACKREST_REPO1_S3_KEY: ${R2_ACCESS_KEY_ID}
+      PGBACKREST_REPO1_S3_KEY_SECRET: ${R2_SECRET_ACCESS_KEY}
+      PGBACKREST_REPO1_S3_URI_STYLE: path
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:ro
+      - pgbackrest_data:/var/lib/pgbackrest
+      - ./config/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+    networks:
+      - backup-network
+    profiles:
+      - pgbackrest
+
+  # ==========================================================================
+  # Restic - File and Asset Backup
+  # ==========================================================================
+  restic:
+    image: restic/restic:latest
+    container_name: renderowl-restic
+    environment:
+      # R2 Configuration for Restic
+      AWS_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      RESTIC_REPOSITORY: s3:${R2_ENDPOINT_PRIMARY}/${R2_BUCKET_PRIMARY:-renderowl-backups-primary}/files
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:-changeme}
+      RESTIC_CACHE_DIR: /cache
+    volumes:
+      - app_uploads:/data/uploads:ro
+      - app_assets:/data/assets:ro
+      - restic_cache:/cache
+    networks:
+      - backup-network
+    profiles:
+      - files
+    command: >
+      sh -c "
+        # Initialize repository if needed
+        restic snapshots || restic init
+        echo 'Restic ready for file backups'
+        sleep infinity
+      "
+
+  # ==========================================================================
+  # Prometheus Node Exporter (for backup metrics)
+  # ==========================================================================
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: renderowl-node-exporter
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.textfile.directory=/var/lib/node_exporter/textfile_collector'
+    volumes:
+      - /:/host:ro,rslave
+      - ./metrics:/var/lib/node_exporter/textfile_collector:ro
+    networks:
+      - backup-network
+    profiles:
+      - monitoring
+
+  # ==========================================================================
+  # Backup Scheduler (cron alternative)
+  # ==========================================================================
+  scheduler:
+    build:
+      context: ./docker/scheduler
+      dockerfile: Dockerfile
+    container_name: renderowl-backup-scheduler
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-renderowl}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_PRIMARY: ${R2_BUCKET_PRIMARY:-renderowl-backups-primary}
+      R2_BUCKET_SECONDARY: ${R2_BUCKET_SECONDARY:-renderowl-backups-secondary}
+      R2_ENDPOINT_PRIMARY: ${R2_ENDPOINT_PRIMARY}
+      R2_ENDPOINT_SECONDARY: ${R2_ENDPOINT_SECONDARY}
+      GPG_RECIPIENT: ${GPG_RECIPIENT}
+    volumes:
+      - ./scripts:/backup/scripts:ro
+      - ./config/backup.env:/backup/.env:ro
+      - ./keys:/backup/keys:ro
+      - backup_logs:/var/log/renderowl
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - backup-network
+    depends_on:
+      - postgres
+    profiles:
+      - scheduler
+
+  # ==========================================================================
+  # MinIO Gateway (for testing R2 locally)
+  # ==========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: renderowl-minio-test
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - backup-network
+    profiles:
+      - local-test
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  backup-network:
+    driver: bridge
+    name: renderowl-backup-network
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  pgbackrest_data:
+    driver: local
+  wal_g_cache:
+    driver: local
+  restic_cache:
+    driver: local
+  minio_data:
+    driver: local
+  backup_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/renderowl
+  app_uploads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/www/renderowl/uploads
+  app_assets:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/www/renderowl/assets

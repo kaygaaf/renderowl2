@@ -1,0 +1,387 @@
+# Promtail Configuration for Renderowl 2.0
+# Collects logs from: Go backend, Next.js frontend, Nginx, PostgreSQL, Redis, System
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+  log_format: json
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  # ============================================
+  # Go Backend Application Logs
+  # ============================================
+  - job_name: renderowl-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: renderowl-backend
+          app: renderowl
+          component: backend
+          environment: staging
+          __path__: /var/log/renderowl/backend/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            timestamp: time
+            service: service
+            request_id: request_id
+            user_id: user_id
+            duration: duration_ms
+            error: error
+      - labels:
+          level:
+          service:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - output:
+          source: msg
+
+  # Go Backend Structured Logs (alternative path)
+  - job_name: renderowl-backend-structured
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: renderowl-backend-structured
+          app: renderowl
+          component: backend
+          environment: staging
+          __path__: /var/log/renderowl/app.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+            logger: logger
+            caller: caller
+            trace_id: trace_id
+            span_id: span_id
+      - labels:
+          level:
+          logger:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - output:
+          source: message
+
+  # ============================================
+  # Next.js Frontend Logs
+  # ============================================
+  - job_name: renderowl-frontend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: renderowl-frontend
+          app: renderowl
+          component: frontend
+          environment: staging
+          __path__: /var/log/renderowl/frontend/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+            page: page
+            method: method
+            status_code: statusCode
+            url: url
+      - labels:
+          level:
+          page:
+          method:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - output:
+          source: message
+
+  # ============================================
+  # Nginx Access Logs (JSON format)
+  # ============================================
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access
+          app: renderowl
+          component: nginx
+          environment: staging
+          log_type: access
+          __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      - json:
+          expressions:
+            remote_addr: remote_addr
+            time_local: time_local
+            request: request
+            status: status
+            body_bytes_sent: body_bytes_sent
+            request_time: request_time
+            http_referer: http_referer
+            http_user_agent: http_user_agent
+            request_id: request_id
+            upstream_response_time: upstream_response_time
+      - labels:
+          status:
+          request_method:
+      - timestamp:
+          source: time_local
+          format: "02/Jan/2006:15:04:05 -0700"
+      - output:
+          source: request
+
+  # Nginx Error Logs
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          app: renderowl
+          component: nginx
+          environment: staging
+          log_type: error
+          __path__: /var/log/nginx/error.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<pid>\d+)#(?P<tid>\d+): (?:\*\d+ )?(?P<message>.*)$'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: "2006/01/02 15:04:05"
+      - output:
+          source: message
+
+  # ============================================
+  # PostgreSQL Logs
+  # ============================================
+  - job_name: postgresql
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: postgresql
+          app: renderowl
+          component: database
+          environment: staging
+          __path__: /var/log/postgresql/postgresql-*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ \w{3}) \[(?P<pid>\d+)\] (?P<level>\w+):  (?P<message>.*)$'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: "2006-01-02 15:04:05.000 MST"
+      - output:
+          source: message
+
+  # PostgreSQL CSV Logs (if enabled)
+  - job_name: postgresql-csv
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: postgresql-csv
+          app: renderowl
+          component: database
+          environment: staging
+          __path__: /var/log/postgresql/postgresql-*.csv
+    pipeline_stages:
+      - regex:
+          expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ \w{3},"(?P<database>[^"]*)","(?P<user>[^"]*)",\d+,"(?P<client_addr>[^"]*)",[^,]*,\d+,(?P<level>\w+),(?P<code>[^,]*),"(?P<message>[^"]*)"'
+      - labels:
+          database:
+          level:
+          user:
+      - output:
+          source: message
+
+  # ============================================
+  # Redis Logs
+  # ============================================
+  - job_name: redis
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: redis
+          app: renderowl
+          component: cache
+          environment: staging
+          __path__: /var/log/redis/redis-server.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<pid>\d+):(?P<role>[XCSM]) (?P<timestamp>\d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2}\.\d+) (?P<level># [\w ]+)?(?P<message>.*)$'
+      - timestamp:
+          source: timestamp
+          format: "02 Jan 2006 15:04:05.000"
+      - output:
+          source: message
+
+  # ============================================
+  # System Logs (journald/syslog)
+  # ============================================
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          app: renderowl
+          component: system
+          environment: staging
+          __path__: /var/log/syslog
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w{3} \d{1,2} \d{2}:\d{2}:\d{2}) (?P<host>\S+) (?P<service>\S+): (?P<message>.*)$'
+      - labels:
+          service:
+      - timestamp:
+          source: timestamp
+          format: "Jan _2 15:04:05"
+      - output:
+          source: message
+
+  # Kernel Logs
+  - job_name: kernel
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kernel
+          app: renderowl
+          component: system
+          environment: staging
+          __path__: /var/log/kern.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w{3} \d{1,2} \d{2}:\d{2}:\d{2}) (?P<host>\S+) kernel: \[(?P<uptime>[\d.]+)\] (?P<message>.*)$'
+      - timestamp:
+          source: timestamp
+          format: "Jan _2 15:04:05"
+      - output:
+          source: message
+
+  # ============================================
+  # Docker Container Logs (if using Docker)
+  # ============================================
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          app: renderowl
+          component: containers
+          environment: staging
+          __path__: /var/lib/docker/containers/*/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            timestamp: time
+            attrs: attrs
+      - json:
+          source: attrs
+          expressions:
+            container_name: container_name
+            container_id: container_id
+            image: image
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - labels:
+          stream:
+          container_name:
+          image:
+      - output:
+          source: output
+      # Drop healthcheck spam
+      - drop:
+          source: output
+          expression: "(healthcheck|ping|/health)"
+
+  # ============================================
+  # Renderowl Worker Logs (video processing)
+  # ============================================
+  - job_name: renderowl-worker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: renderowl-worker
+          app: renderowl
+          component: worker
+          environment: staging
+          __path__: /var/log/renderowl/worker/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            timestamp: timestamp
+            job_id: job_id
+            video_id: video_id
+            user_id: user_id
+            progress: progress
+            stage: stage
+            duration: duration_sec
+            error: error
+      - labels:
+          level:
+          stage:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - output:
+          source: msg
+
+  # ============================================
+  # Audit/Security Logs
+  # ============================================
+  - job_name: auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          app: renderowl
+          component: security
+          environment: staging
+          __path__: /var/log/auth.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w{3} \d{1,2} \d{2}:\d{2}:\d{2}) (?P<host>\S+) (?P<service>\S+): (?P<message>.*)$'
+      - labels:
+          service:
+      - timestamp:
+          source: timestamp
+          format: "Jan _2 15:04:05"
+      - output:
+          source: message

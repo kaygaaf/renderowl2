@@ -1,0 +1,15 @@
+[Unit]
+Description=PostgreSQL Backup Retention Policy
+After=network.target
+
+[Service]
+Type=oneshot
+User=postgres
+Group=postgres
+EnvironmentFile=/etc/backup/backup.env
+ExecStart=/usr/local/bin/retention.sh all
+StandardOutput=append:/var/log/postgresql/retention.log
+StandardError=append:/var/log/postgresql/retention.log
+
+[Install]
+WantedBy=multi-user.target

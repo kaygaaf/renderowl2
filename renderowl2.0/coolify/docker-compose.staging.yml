@@ -1,0 +1,75 @@
+# Coolify Staging Configuration
+# For staging.renderowl.app
+
+services:
+  frontend:
+    image: ghcr.io/kayorama/renderowl-frontend:staging-latest
+    environment:
+      - NODE_ENV=staging
+      - NEXT_PUBLIC_API_URL=https://api-staging.renderowl.app
+      - NEXT_PUBLIC_APP_URL=https://staging.renderowl.app
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+    ports:
+      - 3000:3000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/kayorama/renderowl-backend:staging-latest
+    environment:
+      - ENVIRONMENT=staging
+      - PORT=8080
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET_UPLOADS=${S3_BUCKET_UPLOADS:-renderowl-staging-uploads}
+      - S3_BUCKET_EXPORTS=${S3_BUCKET_EXPORTS:-renderowl-staging-exports}
+      - JWT_SECRET=${JWT_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - SENTRY_DSN=${SENTRY_DSN}
+    ports:
+      - 8080:8080
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/renderowl-api", "health-check"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/kayorama/renderowl-worker:staging-latest
+    environment:
+      - NODE_ENV=staging
+      - REDIS_URL=${REDIS_URL}
+      - API_URL=http://backend:8080
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET_UPLOADS=${S3_BUCKET_UPLOADS:-renderowl-staging-uploads}
+      - S3_BUCKET_EXPORTS=${S3_BUCKET_EXPORTS:-renderowl-staging-exports}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CONCURRENT_JOBS=1
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    restart: unless-stopped
