@@ -1,0 +1,31 @@
+import { auth } from "@clerk/nextjs/server"
+import { redirect } from "next/navigation"
+import { Navbar } from "@/components/layout/Navbar"
+import { Sidebar } from "@/components/layout/Sidebar"
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs"
+import { BillingContent } from "@/components/dashboard/BillingContent"
+
+export default async function BillingPage() {
+  const { userId } = await auth()
+  
+  if (!userId) {
+    redirect("/auth?mode=login")
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navbar user={{ name: "User", email: "user@example.com" }} />
+      <div className="flex flex-1">
+        <Sidebar />
+        <main className="flex-1 ml-64 pt-16">
+          <div className="container p-6">
+            <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Billing" }]} />
+            <h1 className="text-3xl font-bold mt-4 mb-8">Billing & Plans</h1>
+            
+            <BillingContent />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
