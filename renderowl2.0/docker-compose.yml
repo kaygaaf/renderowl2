@@ -1,0 +1,183 @@
+# Renderowl 2.0 - Local Development
+# Run: docker-compose up -d
+
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: renderowl-postgres
+    environment:
+      POSTGRES_USER: renderowl
+      POSTGRES_PASSWORD: renderowl_dev
+      POSTGRES_DB: renderowl_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U renderowl"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: renderowl-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MinIO (S3-compatible storage for local dev)
+  minio:
+    image: minio/minio:latest
+    container_name: renderowl-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Create MinIO buckets on startup
+  minio-create-buckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/renderowl-uploads || true;
+      /usr/bin/mc mb myminio/renderowl-exports || true;
+      /usr/bin/mc policy set public myminio/renderowl-uploads;
+      /usr/bin/mc policy set public myminio/renderowl-exports;
+      exit 0;
+      "
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: renderowl-backend
+    environment:
+      ENVIRONMENT: development
+      PORT: 8080
+      DATABASE_URL: postgres://renderowl:renderowl_dev@postgres:5432/renderowl_dev?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET_UPLOADS: renderowl-uploads
+      S3_BUCKET_EXPORTS: renderowl-exports
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: ["/usr/local/bin/renderowl-api"]
+    develop:
+      watch:
+        - action: rebuild
+          path: ./backend
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
+    container_name: renderowl-frontend
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+
+  # Video Rendering Worker
+  worker:
+    build:
+      context: ./worker
+      dockerfile: ../Dockerfile.worker
+    container_name: renderowl-worker
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      API_URL: http://backend:8080
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET_UPLOADS: renderowl-uploads
+      S3_BUCKET_EXPORTS: renderowl-exports
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      - redis
+      - backend
+      - minio
+    volumes:
+      - ./worker:/app
+      - worker_output:/app/output
+
+  # Queue monitoring (optional)
+  bull-board:
+    image: deadly0/bull-board:latest
+    container_name: renderowl-bull-board
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    ports:
+      - "3002:3000"
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  worker_output:
+
+networks:
+  default:
+    name: renderowl-network

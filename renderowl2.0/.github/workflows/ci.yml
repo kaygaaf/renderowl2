@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.changes.outputs.frontend }}
+      backend: ${{ steps.changes.outputs.backend }}
+      worker: ${{ steps.changes.outputs.worker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - 'shared/**'
+            backend:
+              - 'backend/**'
+              - 'shared/**'
+            worker:
+              - 'worker/**'
+              - 'shared/**'
+
+  test-frontend:
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Run tests
+        run: npm run test:ci
+      
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8080
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+  test-backend:
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: renderowl
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: renderowl_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: './backend/go.sum'
+      
+      - name: Install dependencies
+        run: go mod download
+      
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: ./backend
+          args: --timeout=5m
+      
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+        env:
+          DATABASE_URL: postgres://renderowl:test@localhost:5432/renderowl_test?sslmode=disable
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret-key-for-ci-only
+          ENVIRONMENT: test
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage.out
+          flags: backend
+          name: backend-coverage
+
+  test-worker:
+    needs: changes
+    if: ${{ needs.changes.outputs.worker == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./worker
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './worker/package-lock.json'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Run tests
+        run: npm run test:ci
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  build-images:
+    needs: [changes, test-frontend, test-backend, test-worker]
+    if: ${{ always() && (needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build frontend image
+        if: ${{ needs.changes.outputs.frontend == 'true' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./Dockerfile.frontend
+          push: false
+          load: true
+          tags: renderowl-frontend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build backend image
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./Dockerfile.backend
+          push: false
+          load: true
+          tags: renderowl-backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

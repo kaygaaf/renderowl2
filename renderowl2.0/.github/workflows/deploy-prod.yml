@@ -1,0 +1,203 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+      confirm:
+        description: 'Type "DEPLOY" to confirm production deployment'
+        required: true
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: renderowl
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify deployment confirmation
+        if: ${{ github.event.inputs.confirm != 'DEPLOY' }}
+        run: |
+          echo "❌ Deployment not confirmed. Please type DEPLOY to proceed."
+          exit 1
+      
+      - name: Verify staging is healthy
+        run: |
+          echo "🔍 Checking staging health before production deploy..."
+          curl -sf https://staging.renderowl.app/api/health || (echo "❌ Staging unhealthy" && exit 1)
+          curl -sf https://api-staging.renderowl.app/health || (echo "❌ Staging API unhealthy" && exit 1)
+          echo "✅ Staging is healthy"
+
+  build-and-push:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="${{ github.sha }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🚀 Building version: $VERSION"
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./Dockerfile.frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/frontend:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./Dockerfile.backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build and push worker
+        uses: docker/build-push-action@v5
+        with:
+          context: ./worker
+          file: ./Dockerfile.worker
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/worker:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/worker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-production:
+    needs: [verify, build-and-push]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://renderowl.app
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Coolify Production
+        env:
+          COOLIFY_API_KEY: ${{ secrets.COOLIFY_API_KEY }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_PROD_PROJECT_ID: ${{ secrets.COOLIFY_PROD_PROJECT_ID }}
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          echo "🚀 Deploying version $VERSION to production..."
+          
+          # Trigger Coolify deployment
+          curl -X POST \
+            "${COOLIFY_URL}/api/v1/deployments" \
+            -H "Authorization: Bearer ${COOLIFY_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"project_uuid\": \"${COOLIFY_PROD_PROJECT_ID}\",
+              \"environment\": \"production\",
+              \"tag\": \"${VERSION}\"
+            }"
+      
+      - name: Wait for deployment
+        run: sleep 60
+      
+      - name: Production health check
+        run: |
+          echo "🏥 Running production health checks..."
+          
+          # Frontend health check with retries
+          for i in {1..5}; do
+            curl -sf https://renderowl.app/api/health && break
+            echo "Attempt $i failed, retrying..."
+            sleep 10
+          done || (echo "❌ Frontend health check failed" && exit 1)
+          
+          # Backend health check
+          for i in {1..5}; do
+            curl -sf https://api.renderowl.app/health && break
+            echo "Attempt $i failed, retrying..."
+            sleep 10
+          done || (echo "❌ Backend health check failed" && exit 1)
+          
+          echo "✅ Production deployment healthy!"
+      
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: renderowl
+        with:
+          environment: production
+          version: ${{ needs.build-and-push.outputs.version }}
+      
+      - name: Notify Discord
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          title: "🚀 Production Deployment ${{ job.status }}"
+          description: |
+            **Version:** ${{ needs.build-and-push.outputs.version }}
+            **Deployed by:** ${{ github.actor }}
+            **Frontend:** ${{ needs.build-and-push.outputs.version }}
+            **Backend:** ${{ needs.build-and-push.outputs.version }}
+          color: ${{ job.status == 'success' && '0x00ff00' || '0xff0000' }}
+          url: "https://renderowl.app"
+
+  rollback-on-failure:
+    needs: deploy-production
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify rollback
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          title: "⚠️ Production Deployment Failed"
+          description: |
+            Deployment of version ${{ needs.build-and-push.outputs.version }} failed.
+            Manual rollback may be required.
+          color: '0xffa500'
+          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

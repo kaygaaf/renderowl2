@@ -1,0 +1,56 @@
+# Renderowl Backend - Dockerfile
+# Go 1.22 + Gin production build
+
+# Stage 1: Build
+FROM golang:1.22-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Set working directory
+WORKDIR /build
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+  -ldflags='-w -s -extldflags "-static"' \
+  -a -installsuffix cgo \
+  -o renderowl-api \
+  ./cmd/api
+
+# Build worker binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+  -ldflags='-w -s -extldflags "-static"' \
+  -a -installsuffix cgo \
+  -o renderowl-worker \
+  ./cmd/worker
+
+# Stage 2: Production
+FROM scratch
+
+# Import from builder
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# Copy binaries
+COPY --from=builder /build/renderowl-api /usr/local/bin/
+COPY --from=builder /build/renderowl-worker /usr/local/bin/
+
+# Create non-root user
+USER 65534:65534
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["/usr/local/bin/renderowl-api", "health-check"] || exit 1
+
+# Default to API mode
+ENTRYPOINT ["/usr/local/bin/renderowl-api"]
