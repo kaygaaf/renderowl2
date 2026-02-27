@@ -19,6 +19,11 @@ type TimelineModel struct {
 	Tracks      []TrackModel `gorm:"foreignKey:TimelineID;constraint:OnDelete:CASCADE;"`
 }
 
+// TableName specifies the table name for TimelineModel
+func (TimelineModel) TableName() string {
+	return "timelines"
+}
+
 // TrackModel is the database model for tracks
 type TrackModel struct {
 	ID         string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
@@ -31,6 +36,11 @@ type TrackModel struct {
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	Clips      []ClipModel `gorm:"foreignKey:TrackID;constraint:OnDelete:CASCADE;"`
+}
+
+// TableName specifies the table name for TrackModel
+func (TrackModel) TableName() string {
+	return "tracks"
 }
 
 // ClipModel is the database model for clips
@@ -55,6 +65,11 @@ type ClipModel struct {
 	TextStyle   *TextStyleModel `gorm:"embedded;embeddedPrefix:text_"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+// TableName specifies the table name for ClipModel
+func (ClipModel) TableName() string {
+	return "clips"
 }
 
 // TextStyleModel is the database model for text styling
