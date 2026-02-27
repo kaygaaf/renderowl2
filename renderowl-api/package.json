@@ -18,11 +18,21 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch server.ts",
+    "dev:enhanced": "tsx watch server-enhanced.ts",
     "start": "node dist/server.js",
+    "start:enhanced": "node dist/server-enhanced.js",
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "migrate": "node scripts/migrate.js",
+    "migrate:status": "node scripts/migrate.js --status",
+    "db:cleanup": "node scripts/db-maintenance.js cleanup",
+    "db:stats": "node scripts/db-maintenance.js stats",
+    "db:optimize": "node scripts/db-maintenance.js optimize",
+    "db:integrity": "node scripts/db-maintenance.js integrity",
+    "load-test": "node scripts/load-test.js",
+    "load-test:health": "node scripts/load-test.js --endpoint /health --duration 60 --concurrency 50"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
