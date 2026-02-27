@@ -20,6 +20,7 @@ import integrationRoutes from './routes/integrations.js';
 import youtubeRoutes from './routes/youtube.js';
 import rssRoutes from './routes/rss.js';
 import templateRoutes from './routes/templates.js';
+import analyticsRoutes from './routes/analytics.js';
 import rateLimitPlugin from './lib/ratelimit/index.js';
 import { apiKeyAuthPlugin } from './lib/apikeys/index.js';
 import { JobQueue } from './lib/queue.js';
@@ -195,9 +196,18 @@ await fastify.register(
       const auth = request.headers.authorization;
       const apiKey = request.headers['x-api-key'];
 
-      // Check for API key first
+      // Check for API key first (handled by apiKeyAuthPlugin)
       if (apiKey && typeof apiKey === 'string') {
-        // API key auth handled by apiKeyAuthPlugin
+        // API key auth handled by apiKeyAuthPlugin - if it didn't set user, it's invalid
+        if (!request.user) {
+          reply.status(401).send({
+            type: 'https://api.renderowl.com/errors/invalid-api-key',
+            title: 'Invalid API Key',
+            status: 401,
+            detail: 'The provided API key is invalid or has been revoked',
+            instance: request.url,
+          });
+        }
         return;
       }
 
@@ -213,12 +223,32 @@ await fastify.register(
         return;
       }
 
-      // In production, validate token and set user context
-      request.user = {
-        id: 'user_dev123',
-        email: 'dev@renderowl.com',
-        tier: 'pro',
-      };
+      // Validate JWT token
+      try {
+        const decoded = await request.jwtVerify() as { id: string; email?: string; tier?: string };
+        
+        // Validate decoded token has required fields
+        if (!decoded || typeof decoded !== 'object' || !decoded.id) {
+          throw new Error('Invalid token payload');
+        }
+
+        request.user = {
+          id: decoded.id,
+          email: decoded.email || null,
+          tier: decoded.tier || 'free',
+          authType: 'jwt',
+        };
+      } catch (err) {
+        request.log.warn({ err, url: request.url }, 'JWT verification failed');
+        reply.status(401).send({
+          type: 'https://api.renderowl.com/errors/invalid-token',
+          title: 'Invalid Token',
+          status: 401,
+          detail: err instanceof Error ? err.message : 'Invalid or expired token',
+          instance: request.url,
+        });
+        return;
+      }
     });
 
     // Register route modules
@@ -236,6 +266,7 @@ await fastify.register(
     await api.register(youtubeRoutes, { prefix: '/youtube' });
     await api.register(rssRoutes, { prefix: '/rss' });
     await api.register(templateRoutes, { prefix: '/templates' });
+    await api.register(analyticsRoutes, { prefix: '/analytics' });
   },
   { prefix: '/v1' }
 );

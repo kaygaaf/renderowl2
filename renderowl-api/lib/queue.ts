@@ -351,39 +351,49 @@ export class JobQueue extends EventEmitter {
   }
 
   private claimNextJob(): Job | null {
+    // Use atomic UPDATE with RETURNING to prevent race conditions
+    // The subquery finds the next available job, then we update and return it atomically
+    const timeoutAt = new Date(Date.now() + this.retryConfig.jobTimeoutMs).toISOString();
+    const now = new Date().toISOString();
+
     const stmt = this.db.prepare(`
-      SELECT * FROM jobs 
-      WHERE status = 'pending' 
-        AND scheduled_at <= datetime('now')
-      ORDER BY 
-        CASE priority
-          WHEN 'urgent' THEN 0
-          WHEN 'high' THEN 1
-          WHEN 'normal' THEN 2
-          WHEN 'low' THEN 3
-        END,
-        scheduled_at ASC
-      LIMIT 1
+      UPDATE jobs 
+      SET status = 'processing', 
+          worker_id = ?, 
+          started_at = ?, 
+          timeout_at = ?, 
+          attempts = attempts + 1, 
+          updated_at = ?
+      WHERE id = (
+        SELECT id FROM jobs 
+        WHERE status = 'pending' 
+          AND scheduled_at <= datetime('now')
+        ORDER BY 
+          CASE priority
+            WHEN 'urgent' THEN 0
+            WHEN 'high' THEN 1
+            WHEN 'normal' THEN 2
+            WHEN 'low' THEN 3
+          END,
+          scheduled_at ASC
+        LIMIT 1
+      )
+      AND status = 'pending'
+      RETURNING *
     `);
 
-    const row = stmt.get() as any;
+    const row = stmt.get(this.workerId, now, timeoutAt, now) as any;
+    
     if (!row) return null;
 
-    // Calculate timeout for this job
-    const timeoutAt = new Date(Date.now() + this.retryConfig.jobTimeoutMs).toISOString();
-
-    // Claim the job
-    const now = new Date().toISOString();
-    const updateStmt = this.db.prepare(`
-      UPDATE jobs 
-      SET status = 'processing', worker_id = ?, started_at = ?, timeout_at = ?, attempts = attempts + 1, updated_at = ?
-      WHERE id = ? AND status = 'pending'
-    `);
-
-    const result = updateStmt.run(this.workerId, now, timeoutAt, now, row.id);
-    if (result.changes === 0) return null; // Another worker claimed it
-
-    return this.hydrateJob({ ...row, status: 'processing', worker_id: this.workerId, started_at: now, timeout_at: timeoutAt, attempts: row.attempts + 1 });
+    return this.hydrateJob({
+      ...row,
+      status: 'processing',
+      worker_id: this.workerId,
+      started_at: now,
+      timeout_at: timeoutAt,
+      attempts: row.attempts + 1
+    });
   }
 
   private async processJob(job: Job): Promise<void> {
