@@ -353,8 +353,6 @@ export function handleCORS(
   
   if (typeof config.corsOrigins === 'function') {
     allowed = origin ? config.corsOrigins(origin) : false;
-  } else if (config.corsOrigins === '*') {
-    allowed = true;
   } else if (Array.isArray(config.corsOrigins)) {
     allowed = origin ? config.corsOrigins.includes(origin) : false;
   }
@@ -512,5 +510,4 @@ declare module 'fastify' {
   }
 }
 
-export { InputValidator };
 export default securityPlugin;

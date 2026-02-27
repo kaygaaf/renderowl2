@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { EventEmitter } from 'events';
 import { hostname } from 'os';
 
@@ -615,8 +615,6 @@ export async function monitoringPlugin(
     const uptime = process.uptime();
     const memory = process.memoryUsage();
 
-    const statusCode = overall === 'healthy' ? 200 : overall === 'degraded' ? 200 : 503;
-
     return {
       status: overall,
       timestamp: new Date().toISOString(),
@@ -664,5 +662,4 @@ export async function monitoringPlugin(
   });
 }
 
-export { StructuredLogger, MetricsCollector, HealthMonitor, Tracer };
 export default monitoringPlugin;

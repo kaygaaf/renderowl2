@@ -46,7 +46,7 @@ const logger = new StructuredLogger('renderowl-api',
 // ============================================================================
 
 const dbPath = process.env.QUEUE_DB_PATH || path.join(__dirname, '../data/queue.db');
-const jobQueue = new EnhancedJobQueue(dbPath, {
+const jobQueue: EnhancedJobQueue = new EnhancedJobQueue(dbPath, {
   maxAttempts: 3,
   backoffStrategy: 'exponential',
   baseDelayMs: 1000,
@@ -228,8 +228,6 @@ fastify.decorate('automationRunner', automationRunner);
 // ============================================================================
 
 fastify.health.register('queue', async () => {
-  const stats = jobQueue.getAllStats();
-  const totalProcessing = Object.values(stats).reduce((sum, s) => sum + s.processing, 0);
   const stalled = jobQueue.getStalledJobsCount();
   
   if (stalled > 10) {
@@ -242,7 +240,7 @@ fastify.health.register('queue', async () => {
 fastify.health.register('database', async () => {
   // Check if we can query the queue database
   try {
-    const stats = jobQueue.getAllStats();
+    jobQueue.getAllStats();
     return { status: 'healthy' };
   } catch (error) {
     return { 
@@ -279,7 +277,7 @@ fastify.addHook('onResponse', async (request, reply) => {
   // Metrics
   fastify.metrics?.histogram('http.request.duration', duration, {
     method: request.method,
-    route: request.routerPath || request.url,
+    route: (request as any).routerPath || request.url,
     status: reply.statusCode.toString(),
   });
 

@@ -1,5 +1,49 @@
-import { CalculateCostRequestSchema, CalculateCostResponseSchema, } from '../schemas.js';
+import { CalculateCostRequestSchema, CalculateCostResponseSchema, UserIdSchema, } from '../schemas.js';
 import { calculateVideoCost, deductCredits, addCredits, getUserById } from './user.js';
+// ============================================================================
+// Internal API Configuration
+// ============================================================================
+// API keys allowed for internal credit operations (should come from env in production)
+const INTERNAL_API_KEYS = new Set(process.env.INTERNAL_API_KEYS?.split(',') || []);
+// Admin user IDs (should come from database in production)
+const ADMIN_USER_IDS = new Set(process.env.ADMIN_USER_IDS?.split(',') || []);
+// ============================================================================
+// Authorization Helpers
+// ============================================================================
+/**
+ * Check if request has valid internal API key authorization
+ */
+const hasInternalApiKey = (request) => {
+    const apiKey = request.headers['x-api-key'];
+    if (!apiKey)
+        return false;
+    return INTERNAL_API_KEYS.has(apiKey);
+};
+/**
+ * Check if request is from an admin user
+ */
+const isAdminUser = (request) => {
+    const userId = request.user?.id;
+    if (!userId)
+        return false;
+    return ADMIN_USER_IDS.has(userId);
+};
+/**
+ * Require internal API key or admin authentication
+ */
+const requireInternalAuth = (request, reply) => {
+    if (!hasInternalApiKey(request) && !isAdminUser(request)) {
+        reply.status(403).send({
+            type: 'https://api.renderowl.com/errors/forbidden',
+            title: 'Forbidden',
+            status: 403,
+            detail: 'This endpoint requires internal API key or admin privileges',
+            instance: request.url,
+        });
+        return false;
+    }
+    return true;
+};
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -63,14 +107,49 @@ const calculateCost = async (request, reply) => {
     }
 };
 const deductCreditsHandler = async (request, reply) => {
+    // Require internal auth
+    if (!requireInternalAuth(request, reply))
+        return;
     const { user_id, amount, description, metadata } = request.body;
+    // Validate user_id format
+    const userIdValidation = UserIdSchema.safeParse(user_id);
+    if (!userIdValidation.success) {
+        return reply.status(400).send({
+            type: 'https://api.renderowl.com/errors/invalid-id',
+            title: 'Invalid User ID',
+            status: 400,
+            detail: `The user ID "${user_id}" is not valid`,
+            instance: '/credits/deduct',
+        });
+    }
     // Validate amount
-    if (!Number.isInteger(amount) || amount <= 0) {
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 1000000) {
         return reply.status(400).send({
             type: 'https://api.renderowl.com/errors/invalid-request',
             title: 'Invalid Request',
             status: 400,
-            detail: 'Amount must be a positive integer',
+            detail: 'Amount must be a positive integer (max 1,000,000)',
+            instance: '/credits/deduct',
+        });
+    }
+    // Validate description
+    if (!description || typeof description !== 'string' || description.length < 1 || description.length > 500) {
+        return reply.status(400).send({
+            type: 'https://api.renderowl.com/errors/invalid-request',
+            title: 'Invalid Request',
+            status: 400,
+            detail: 'Description must be a string between 1 and 500 characters',
+            instance: '/credits/deduct',
+        });
+    }
+    // Check user exists
+    const user = getUserById(user_id);
+    if (!user) {
+        return reply.status(404).send({
+            type: 'https://api.renderowl.com/errors/not-found',
+            title: 'User Not Found',
+            status: 404,
+            detail: `User with ID "${user_id}" does not exist`,
             instance: '/credits/deduct',
         });
     }
@@ -84,31 +163,57 @@ const deductCreditsHandler = async (request, reply) => {
             instance: '/credits/deduct',
             user_id,
             required: amount,
+            current_balance: user.credits_balance,
         });
     }
     // Get updated balance
-    const user = getUserById(user_id);
+    const updatedUser = getUserById(user_id);
     return reply.send({
         success: true,
         user_id,
         deducted: amount,
-        balance_after: user?.credits_balance ?? 0,
+        balance_after: updatedUser?.credits_balance ?? 0,
     });
 };
 const addCreditsHandler = async (request, reply) => {
+    // Require internal auth
+    if (!requireInternalAuth(request, reply))
+        return;
     const { user_id, amount, description, metadata } = request.body;
+    // Validate user_id format
+    const userIdValidation = UserIdSchema.safeParse(user_id);
+    if (!userIdValidation.success) {
+        return reply.status(400).send({
+            type: 'https://api.renderowl.com/errors/invalid-id',
+            title: 'Invalid User ID',
+            status: 400,
+            detail: `The user ID "${user_id}" is not valid`,
+            instance: '/credits/add',
+        });
+    }
     // Validate amount
-    if (!Number.isInteger(amount) || amount <= 0) {
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 1000000) {
         return reply.status(400).send({
             type: 'https://api.renderowl.com/errors/invalid-request',
             title: 'Invalid Request',
             status: 400,
-            detail: 'Amount must be a positive integer',
+            detail: 'Amount must be a positive integer (max 1,000,000)',
             instance: '/credits/add',
         });
     }
-    const success = addCredits(user_id, amount, description, metadata);
-    if (!success) {
+    // Validate description
+    if (!description || typeof description !== 'string' || description.length < 1 || description.length > 500) {
+        return reply.status(400).send({
+            type: 'https://api.renderowl.com/errors/invalid-request',
+            title: 'Invalid Request',
+            status: 400,
+            detail: 'Description must be a string between 1 and 500 characters',
+            instance: '/credits/add',
+        });
+    }
+    // Check user exists
+    const user = getUserById(user_id);
+    if (!user) {
         return reply.status(404).send({
             type: 'https://api.renderowl.com/errors/not-found',
             title: 'User Not Found',
@@ -117,18 +222,52 @@ const addCreditsHandler = async (request, reply) => {
             instance: '/credits/add',
         });
     }
+    const success = addCredits(user_id, amount, description, metadata);
+    if (!success) {
+        return reply.status(500).send({
+            type: 'https://api.renderowl.com/errors/internal-error',
+            title: 'Internal Server Error',
+            status: 500,
+            detail: 'Failed to add credits',
+            instance: '/credits/add',
+        });
+    }
     // Get updated balance
-    const user = getUserById(user_id);
+    const updatedUser = getUserById(user_id);
     return reply.send({
         success: true,
         user_id,
         added: amount,
-        balance_after: user?.credits_balance ?? 0,
+        balance_after: updatedUser?.credits_balance ?? 0,
     });
 };
 const checkCreditsHandler = async (request, reply) => {
+    // Require internal auth
+    if (!requireInternalAuth(request, reply))
+        return;
     const { user_id } = request.params;
     const required = request.query.required ?? 0;
+    // Validate user_id format
+    const userIdValidation = UserIdSchema.safeParse(user_id);
+    if (!userIdValidation.success) {
+        return reply.status(400).send({
+            type: 'https://api.renderowl.com/errors/invalid-id',
+            title: 'Invalid User ID',
+            status: 400,
+            detail: `The user ID "${user_id}" is not valid`,
+            instance: `/credits/check/${user_id}`,
+        });
+    }
+    // Validate required amount
+    if (!Number.isInteger(required) || required < 0 || required > 1000000) {
+        return reply.status(400).send({
+            type: 'https://api.renderowl.com/errors/invalid-request',
+            title: 'Invalid Request',
+            status: 400,
+            detail: 'required must be a non-negative integer (max 1,000,000)',
+            instance: `/credits/check/${user_id}`,
+        });
+    }
     const user = getUserById(user_id);
     if (!user) {
         return reply.status(404).send({

@@ -139,6 +139,48 @@ const detectAssetType = (contentType: string, filename: string): AssetRecord['ty
   return extToType[ext] || 'other';
 };
 
+// Allowed file extensions whitelist
+const ALLOWED_EXTENSIONS = new Set([
+  'mp4', 'webm', 'mov', 'avi', 'mkv',
+  'mp3', 'wav', 'ogg', 'aac', 'flac',
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
+  'vtt', 'srt', 'json',
+  'ttf', 'otf', 'woff', 'woff2',
+]);
+
+// Blocked file extensions (potential security risks)
+const BLOCKED_EXTENSIONS = new Set([
+  'exe', 'dll', 'bat', 'cmd', 'sh', 'php', 'jsp', 'asp', 'aspx',
+  'py', 'rb', 'pl', 'cgi', 'jar', 'war', 'ear', 'ps1', 'vbs',
+  'js', 'html', 'htm', 'svg',  // SVG can contain scripts
+]);
+
+// Validate filename for security
+const validateFilename = (filename: string): { valid: boolean; error?: string } => {
+  // Check for path traversal
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return { valid: false, error: 'Filename cannot contain path traversal characters' };
+  }
+
+  // Check for null bytes
+  if (filename.includes('\0')) {
+    return { valid: false, error: 'Filename cannot contain null bytes' };
+  }
+
+  // Check extension
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+  if (BLOCKED_EXTENSIONS.has(ext)) {
+    return { valid: false, error: `File type "${ext}" is not allowed for security reasons` };
+  }
+
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return { valid: false, error: `File type "${ext}" is not supported` };
+  }
+
+  return { valid: true };
+};
+
 // Generate simulated presigned upload URL
 const generatePresignedUploadUrl = (
   assetId: string,
@@ -168,8 +210,22 @@ const generateSignedDownloadUrl = (asset: AssetRecord): string => {
 };
 
 // ============================================================================
-// Route Factory
+// Asset Reference Checking
 // ============================================================================
+
+// Import render data from renders module for asset reference checking
+// In production, this would be a database query
+import { rendersStore as getRendersStore } from './renders.js';
+
+const getAllRenders = (): Map<string, any> => {
+  // This is a workaround for circular dependency
+  // In production, use a proper database query
+  try {
+    return getRendersStore || new Map();
+  } catch {
+    return new Map();
+  }
+};
 
 export default async function assetsRoutes(
   fastify: FastifyInstance,
@@ -305,6 +361,18 @@ export default async function assetsRoutes(
       const data = validation.data;
       const timestamp = now();
       const assetId = generateAssetId();
+
+      // Validate filename for security
+      const filenameValidation = validateFilename(data.filename);
+      if (!filenameValidation.valid) {
+        return reply.status(400).send({
+          type: 'https://api.renderowl.com/errors/validation-failed',
+          title: 'Validation Failed',
+          status: 400,
+          detail: filenameValidation.error,
+          instance: `/projects/${project_id}/assets/upload`,
+        });
+      }
 
       // Detect asset type
       const assetType = detectAssetType(data.content_type, data.filename);
@@ -670,8 +738,35 @@ export default async function assetsRoutes(
       });
     }
 
-    // TODO: Check if asset is referenced by active renders before deleting
-    // For now, just delete
+    // Check if asset is referenced by active renders
+    const activeRenderStatuses = ['pending', 'queued', 'rendering'];
+    const activeRenders: string[] = [];
+    
+    // Import rendersStore from renders.ts - in production this would be a database query
+    // For now, we check all renders for asset references
+    for (const [renderId, render] of getAllRenders()) {
+      if (activeRenderStatuses.includes(render.status)) {
+        // Check if this render references the asset in input_props
+        const assetRef = `asset://${id}`;
+        const inputPropsStr = JSON.stringify(render.input_props);
+        if (inputPropsStr.includes(assetRef)) {
+          activeRenders.push(renderId);
+        }
+      }
+    }
+
+    if (activeRenders.length > 0) {
+      return reply.status(409).send({
+        type: 'https://api.renderowl.com/errors/asset-in-use',
+        title: 'Asset In Use',
+        status: 409,
+        detail: `Cannot delete asset "${asset.name}" because it is referenced by ${activeRenders.length} active render(s): ${activeRenders.join(', ')}`,
+        instance: `/projects/${project_id}/assets/${id}`,
+        active_renders: activeRenders,
+      });
+    }
+
+    // Safe to delete
     assetsStore.delete(id);
     uploadSessions.delete(id);
 

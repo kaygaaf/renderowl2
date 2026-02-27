@@ -1,4 +1,3 @@
-import { FastifyInstance } from 'fastify';
 import { EventEmitter } from 'events';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 
@@ -200,6 +199,10 @@ export class EnhancedJobQueue extends EventEmitter {
   private processingJobs = new Set<string>();
   private statementCache = new Map<string, ReturnType<DatabaseType['prepare']>>();
 
+  // Compatibility with base JobQueue interface
+  get retryConfig(): WorkerConfig {
+    return this.workerConfig;
+  }
   constructor(dbPath: string, workerConfig: Partial<WorkerConfig> = {}) {
     super();
     this.db = new Database(dbPath);
@@ -284,7 +287,7 @@ export class EnhancedJobQueue extends EventEmitter {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      stmt.run(
+      stmt.run([
         job.id,
         job.queue,
         job.type,
@@ -299,7 +302,7 @@ export class EnhancedJobQueue extends EventEmitter {
         now,
         now,
         JSON.stringify(job.metrics)
-      );
+      ]);
 
       this.emit('job:created', { jobId: id, queue, type, priority: job.priority });
       return job;
@@ -456,7 +459,7 @@ export class EnhancedJobQueue extends EventEmitter {
       WHERE id = ? AND status IN ('pending', 'scheduled')
     `);
 
-    const result = updateStmt.run(this.workerId, now, timeoutAt, now, row.id);
+    const result = updateStmt.run([this.workerId, now, timeoutAt, now, row.id]);
     if (result.changes === 0) return null;
 
     const job = this.hydrateJob({ 
@@ -542,7 +545,7 @@ export class EnhancedJobQueue extends EventEmitter {
       WHERE id = ?
     `);
 
-    stmt.run(now, now, JSON.stringify(job.metrics), job.id);
+    stmt.run([now, now, JSON.stringify(job.metrics), job.id]);
 
     this.recordMetricsHistory(job, 'completed');
 
@@ -578,7 +581,7 @@ export class EnhancedJobQueue extends EventEmitter {
         WHERE id = ?
       `);
 
-      stmt.run(scheduledAt, error.message, now, JSON.stringify(job.metrics), job.id);
+      stmt.run([scheduledAt, error.message, now, JSON.stringify(job.metrics), job.id]);
 
       this.emit('job:retrying', { 
         jobId: job.id, 
@@ -628,7 +631,7 @@ export class EnhancedJobQueue extends EventEmitter {
           timeout_at = NULL, 
           updated_at = ?
       WHERE worker_id = ? AND status = 'processing'
-    `).run(now, this.workerId);
+    `).run([now, this.workerId]);
 
     // Also reset any jobs from dead workers (no heartbeat for 5 minutes)
     const fiveMinutesAgo = new Date(Date.now() - 300000).toISOString();
@@ -641,7 +644,7 @@ export class EnhancedJobQueue extends EventEmitter {
           updated_at = ?
       WHERE status = 'processing' 
         AND timeout_at < ?
-    `).run(now, fiveMinutesAgo);
+    `).run([now, fiveMinutesAgo]);
   }
 
   private async recoverStalledJobs(): Promise<void> {
@@ -676,7 +679,7 @@ export class EnhancedJobQueue extends EventEmitter {
               timeout_at = NULL,
               updated_at = ?
           WHERE id = ?
-        `).run(now, `Job timed out after ${this.workerConfig.jobTimeoutMs}ms`, now, job.id);
+        `).run([now, `Job timed out after ${this.workerConfig.jobTimeoutMs}ms`, now, job.id]);
       }
     }
   }
@@ -689,7 +692,7 @@ export class EnhancedJobQueue extends EventEmitter {
         id, original_job_id, queue, type, payload, final_error, 
         attempts, step_state, metrics, tags, moved_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `).run([
       `dlq_${job.id}`,
       job.id,
       job.queue,
@@ -701,13 +704,13 @@ export class EnhancedJobQueue extends EventEmitter {
       JSON.stringify(job.metrics),
       JSON.stringify(job.tags),
       now
-    );
+    ]);
 
     this.getStatement(`
       UPDATE jobs 
       SET status = 'dead_letter', error = ?, completed_at = ?, updated_at = ?
       WHERE id = ?
-    `).run(error.message, now, now, job.id);
+    `).run([error.message, now, now, job.id]);
 
     this.recordMetricsHistory(job, 'dead_letter');
 
@@ -726,7 +729,7 @@ export class EnhancedJobQueue extends EventEmitter {
   private updateStats(): void {
     const queues = this.getStatement(`
       SELECT DISTINCT queue FROM jobs
-    `).all() as Array<{ queue: string }>;
+    `).all([]) as Array<{ queue: string }>;
 
     for (const { queue } of queues) {
       const stats = this.getStatement(`
@@ -758,7 +761,7 @@ export class EnhancedJobQueue extends EventEmitter {
           avg_wait_time = excluded.avg_wait_time,
           avg_processing_time = excluded.avg_processing_time,
           updated_at = excluded.updated_at
-      `).run(
+      `).run([
         queue,
         stats?.pending || 0,
         stats?.processing || 0,
@@ -768,7 +771,7 @@ export class EnhancedJobQueue extends EventEmitter {
         stats?.scheduled || 0,
         Math.round(stats?.avg_wait || 0),
         Math.round(stats?.avg_processing || 0)
-      );
+      ]);
     }
   }
 
@@ -803,7 +806,7 @@ export class EnhancedJobQueue extends EventEmitter {
   }
 
   getAllStats(): Record<string, QueueStats> {
-    const rows = this.getStatement(`SELECT * FROM queue_stats`).all() as any[];
+    const rows = this.getStatement(`SELECT * FROM queue_stats`).all([]) as any[];
     const stats: Record<string, QueueStats> = {};
 
     for (const row of rows) {
@@ -837,19 +840,19 @@ export class EnhancedJobQueue extends EventEmitter {
     const stmt = this.getStatement(`
       UPDATE jobs SET steps = ?, step_state = ?, updated_at = ? WHERE id = ?
     `);
-    stmt.run(
+    stmt.run([
       JSON.stringify(job.steps),
       JSON.stringify(job.stepState),
       new Date().toISOString(),
       job.id
-    );
+    ]);
   }
 
   private updateJobMetrics(job: Job): void {
     const stmt = this.getStatement(`
       UPDATE jobs SET metrics = ? WHERE id = ?
     `);
-    stmt.run(JSON.stringify(job.metrics), job.id);
+    stmt.run([JSON.stringify(job.metrics), job.id]);
   }
 
   private recordMetricsHistory(job: Job, status: string): void {
@@ -858,7 +861,7 @@ export class EnhancedJobQueue extends EventEmitter {
         job_id, queue, type, status, wait_time_ms, processing_time_ms, 
         total_time_ms, retry_count
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `).run([
       job.id,
       job.queue,
       job.type,
@@ -867,7 +870,7 @@ export class EnhancedJobQueue extends EventEmitter {
       job.metrics.processingTime,
       job.metrics.totalTime,
       job.metrics.retryCount
-    );
+    ]);
   }
 
   getJob(id: string): Job | null {
@@ -911,7 +914,7 @@ export class EnhancedJobQueue extends EventEmitter {
       UPDATE jobs 
       SET status = 'cancelled', completed_at = ?, updated_at = ?
       WHERE id = ? AND status IN ('pending', 'scheduled')
-    `).run(new Date().toISOString(), new Date().toISOString(), id);
+    `).run([new Date().toISOString(), new Date().toISOString(), id]);
 
     if (result.changes > 0) {
       this.emit('job:cancelled', { jobId: id });
@@ -931,7 +934,7 @@ export class EnhancedJobQueue extends EventEmitter {
       { maxAttempts: 3 }
     );
 
-    this.getStatement('DELETE FROM dead_letter_jobs WHERE id = ?').run(dlqId);
+    this.getStatement('DELETE FROM dead_letter_jobs WHERE id = ?').run([dlqId]);
 
     return newJob;
   }
@@ -942,7 +945,7 @@ export class EnhancedJobQueue extends EventEmitter {
       : 'SELECT * FROM dead_letter_jobs ORDER BY moved_at DESC LIMIT ?';
     
     const stmt = this.getStatement(sql);
-    const rows = queue ? stmt.all(queue, limit) : stmt.all(limit);
+    const rows = queue ? stmt.all([queue, limit]) : stmt.all([limit]);
     
     return (rows as any[]).map(row => ({
       ...row,
@@ -957,8 +960,23 @@ export class EnhancedJobQueue extends EventEmitter {
       SELECT COUNT(*) as count FROM jobs 
       WHERE status = 'processing' 
         AND timeout_at <= datetime('now')
-    `).get() as any;
+    `).get([]) as any;
     return result?.count || 0;
+  }
+
+  // Compatibility methods for base JobQueue interface
+  updateStepState<T>(jobId: string, key: string, value: T): void {
+    const job = this.getJob(jobId);
+    if (!job) throw new Error(`Job not found: ${jobId}`);
+    
+    job.stepState[key] = value;
+    this.updateJobSteps(job);
+  }
+
+  getStepState<T>(jobId: string, key: string): T | undefined {
+    const job = this.getJob(jobId);
+    if (!job) return undefined;
+    return job.stepState[key] as T;
   }
 
   close(): void {

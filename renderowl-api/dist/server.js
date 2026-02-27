@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import path from 'path';
@@ -18,6 +19,7 @@ import integrationRoutes from './routes/integrations.js';
 import youtubeRoutes from './routes/youtube.js';
 import rssRoutes from './routes/rss.js';
 import templateRoutes from './routes/templates.js';
+import analyticsRoutes from './routes/analytics.js';
 import rateLimitPlugin from './lib/ratelimit/index.js';
 import { apiKeyAuthPlugin } from './lib/apikeys/index.js';
 import { JobQueue } from './lib/queue.js';
@@ -95,8 +97,9 @@ fastify.addHook('onResponse', async (request, reply) => {
     }
 });
 // Register plugins
+await fastify.register(helmet, { contentSecurityPolicy: false }); // Add security headers (helmet)
 await fastify.register(cors, {
-    origin: process.env.CORS_ORIGIN || true,
+    origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'development' ? true : ['https://app.renderowl.com', 'https://renderowl.com']),
     credentials: true,
 });
 await fastify.register(jwt, {
@@ -158,9 +161,18 @@ await fastify.register(async function (api) {
     api.addHook('onRequest', async (request, reply) => {
         const auth = request.headers.authorization;
         const apiKey = request.headers['x-api-key'];
-        // Check for API key first
+        // Check for API key first (handled by apiKeyAuthPlugin)
         if (apiKey && typeof apiKey === 'string') {
-            // API key auth handled by apiKeyAuthPlugin
+            // API key auth handled by apiKeyAuthPlugin - if it didn't set user, it's invalid
+            if (!request.user) {
+                reply.status(401).send({
+                    type: 'https://api.renderowl.com/errors/invalid-api-key',
+                    title: 'Invalid API Key',
+                    status: 401,
+                    detail: 'The provided API key is invalid or has been revoked',
+                    instance: request.url,
+                });
+            }
             return;
         }
         // Check for Bearer token
@@ -174,12 +186,31 @@ await fastify.register(async function (api) {
             });
             return;
         }
-        // In production, validate token and set user context
-        request.user = {
-            id: 'user_dev123',
-            email: 'dev@renderowl.com',
-            tier: 'pro',
-        };
+        // Validate JWT token
+        try {
+            const decoded = await request.jwtVerify();
+            // Validate decoded token has required fields
+            if (!decoded || typeof decoded !== 'object' || !decoded.id) {
+                throw new Error('Invalid token payload');
+            }
+            request.user = {
+                id: decoded.id,
+                email: decoded.email || null,
+                tier: decoded.tier || 'free',
+                authType: 'jwt',
+            };
+        }
+        catch (err) {
+            request.log.warn({ err, url: request.url }, 'JWT verification failed');
+            reply.status(401).send({
+                type: 'https://api.renderowl.com/errors/invalid-token',
+                title: 'Invalid Token',
+                status: 401,
+                detail: err instanceof Error ? err.message : 'Invalid or expired token',
+                instance: request.url,
+            });
+            return;
+        }
     });
     // Register route modules
     await api.register(projectsRoutes, { prefix: '/projects' });
@@ -196,6 +227,7 @@ await fastify.register(async function (api) {
     await api.register(youtubeRoutes, { prefix: '/youtube' });
     await api.register(rssRoutes, { prefix: '/rss' });
     await api.register(templateRoutes, { prefix: '/templates' });
+    await api.register(analyticsRoutes, { prefix: '/analytics' });
 }, { prefix: '/v1' });
 // Stripe webhook route (no auth - called by Stripe)
 // This needs raw body for signature verification
@@ -223,7 +255,7 @@ await fastify.post('/v1/stripe/webhook', {
 });
 // Global error handler
 fastify.setErrorHandler((error, request, reply) => {
-    fastify.log.error(error);
+    fastify.log.error({ err: error, reqId: request.id }, 'Unhandled Error');
     if (error.validation) {
         return reply.status(400).send({
             type: 'https://api.renderowl.com/errors/validation-failed',
@@ -233,11 +265,13 @@ fastify.setErrorHandler((error, request, reply) => {
             instance: request.url,
         });
     }
+    // Prevent leaking stack traces or sensitive errors in production
+    const isDev = process.env.NODE_ENV === 'development';
     return reply.status(500).send({
         type: 'https://api.renderowl.com/errors/internal-error',
         title: 'Internal Server Error',
         status: 500,
-        detail: error.message || 'An unexpected error occurred',
+        detail: isDev ? error.message : 'An unexpected internal error occurred. Please contact support.',
         instance: request.url,
     });
 });

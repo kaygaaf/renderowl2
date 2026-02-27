@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginOptions, FastifyReply } from 'fastify';
+import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from 'fastify';
 import { ApiKeyService, SCOPE_TEMPLATES, ALL_SCOPES, SCOPE_DESCRIPTIONS } from '../lib/apikeys/index.js';
 import { ZodError, z } from 'zod';
 
@@ -45,6 +45,32 @@ const handleZodError = (error: ZodError, reply: FastifyReply, instance: string) 
     instance,
     errors,
   });
+};
+
+// ============================================================================
+// Authorization Helpers
+// ============================================================================
+
+// Admin user IDs (should come from database in production)
+const ADMIN_USER_IDS = new Set(process.env.ADMIN_USER_IDS?.split(',') || []);
+
+/**
+ * Check if request is from an admin user
+ */
+const isAdminUser = (request: FastifyRequest): boolean => {
+  const userId = (request.user as any)?.id;
+  if (!userId) return false;
+  return ADMIN_USER_IDS.has(userId);
+};
+
+/**
+ * Validate that scopes don't include admin scope for non-admin users
+ */
+const validateScopes = (scopes: string[], isAdmin: boolean): { valid: boolean; error?: string } => {
+  if (scopes.includes('admin:*') && !isAdmin) {
+    return { valid: false, error: 'Only admin users can create API keys with admin:* scope' };
+  }
+  return { valid: true };
 };
 
 // ============================================================================
@@ -119,6 +145,18 @@ export default async function apiKeyRoutes(
         title: 'Invalid Request',
         status: 400,
         detail: 'Either scopes or template must be provided',
+        instance: '/user/api-keys',
+      });
+    }
+
+    // Validate admin scope restriction
+    const scopeValidation = validateScopes(scopes, isAdminUser(request));
+    if (!scopeValidation.valid) {
+      return reply.status(403).send({
+        type: 'https://api.renderowl.com/errors/forbidden',
+        title: 'Forbidden',
+        status: 403,
+        detail: scopeValidation.error,
         instance: '/user/api-keys',
       });
     }

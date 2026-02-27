@@ -1,4 +1,5 @@
 import { JobQueue, JobOptions } from './queue.js';
+import { EnhancedJobQueue } from './enhanced-queue.js';
 import { Automation } from '../schemas.js';
 export interface AutomationExecution {
     id: string;
@@ -52,7 +53,7 @@ export interface AutomationJobPayload {
 export declare class AutomationRunner {
     private queue;
     private executionStore;
-    constructor(queue: JobQueue);
+    constructor(queue: JobQueue | EnhancedJobQueue);
     private registerHandlers;
     triggerAutomation(automation: Automation, triggerData: Record<string, unknown>, options?: JobOptions): Promise<{
         executionId: string;

@@ -1,4 +1,5 @@
 import { JobQueue, Job, JobOptions } from './queue.js';
+import { EnhancedJobQueue } from './enhanced-queue.js';
 import {
   Automation,
   AutomationAction,
@@ -69,10 +70,10 @@ export interface AutomationJobPayload {
 // ============================================================================
 
 export class AutomationRunner {
-  private queue: JobQueue;
+  private queue: JobQueue | EnhancedJobQueue;
   private executionStore = new Map<string, AutomationExecution>();
 
-  constructor(queue: JobQueue) {
+  constructor(queue: JobQueue | EnhancedJobQueue) {
     this.queue = queue;
     this.registerHandlers();
   }
@@ -87,13 +88,13 @@ export class AutomationRunner {
     // Handle render jobs
     this.queue.registerHandler('render', async (job) => {
       const payload = job.payload as RenderJobPayload;
-      await this.executeRender(payload, job);
+      await this.executeRender(payload, job as Job);
     });
 
     // Handle notification jobs
     this.queue.registerHandler('notify', async (job) => {
       const payload = job.payload as NotificationJobPayload;
-      await this.executeNotification(payload, job);
+      await this.executeNotification(payload, job as Job);
     });
   }
 

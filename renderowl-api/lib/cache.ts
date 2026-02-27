@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 import crypto from 'crypto';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { EventEmitter } from 'events';

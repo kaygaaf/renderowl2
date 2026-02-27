@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { ProjectIdSchema, RenderIdSchema, CreateRenderRequestSchema, RenderStatusSchema, CaptionedVideoInputPropsSchema, RenderOutputUrlResponseSchema, } from '../schemas.js';
 const rendersStore = new Map();
 // Track renders by project for efficient listing
@@ -176,10 +177,63 @@ export default async function renderRoutes(fastify, _opts) {
         // Extract and validate asset references
         extractAssetReferences(data.input_props);
         // In production: validate these assets exist in the project
+        // Validate output settings dimensions
+        const { width, height, fps } = data.output_settings;
+        // Max resolution: 8K (7680x4320)
+        if (width > 7680 || height > 4320) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/validation-failed',
+                title: 'Validation Failed',
+                status: 400,
+                detail: 'Output resolution exceeds maximum allowed (7680x4320 / 8K)',
+                instance: `/projects/${project_id}/renders`,
+            });
+        }
+        // Min resolution: 64x64
+        if (width < 64 || height < 64) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/validation-failed',
+                title: 'Validation Failed',
+                status: 400,
+                detail: 'Output resolution must be at least 64x64',
+                instance: `/projects/${project_id}/renders`,
+            });
+        }
+        // Max FPS: 240
+        if (fps > 240) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/validation-failed',
+                title: 'Validation Failed',
+                status: 400,
+                detail: 'FPS cannot exceed 240',
+                instance: `/projects/${project_id}/renders`,
+            });
+        }
+        // Min FPS: 1
+        if (fps < 1) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/validation-failed',
+                title: 'Validation Failed',
+                status: 400,
+                detail: 'FPS must be at least 1',
+                instance: `/projects/${project_id}/renders`,
+            });
+        }
+        // Validate duration from input_props
+        const durationSec = data.input_props.durationSec || 60;
+        if (durationSec <= 0 || durationSec > 3600) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/validation-failed',
+                title: 'Validation Failed',
+                status: 400,
+                detail: 'Duration must be between 1 second and 1 hour (3600 seconds)',
+                instance: `/projects/${project_id}/renders`,
+            });
+        }
         // Calculate total frames
         const totalFrames = calculateTotalFrames({
             fps: data.output_settings.fps,
-            durationSec: data.input_props.durationSec || 60,
+            durationSec: durationSec,
         });
         const initialProgress = {
             percent: 0,
@@ -440,8 +494,61 @@ export default async function renderRoutes(fastify, _opts) {
             completed_at: render.completed_at,
         });
     });
+    // Validate webhook signature from worker
+    const validateWorkerSignature = (payload, signature) => {
+        const secret = process.env.RENDER_WEBHOOK_SECRET;
+        if (!secret) {
+            console.error('[Webhook] RENDER_WEBHOOK_SECRET not configured');
+            return false;
+        }
+        const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+        return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    };
     fastify.post('/webhooks/progress', async (request, reply) => {
+        // Verify worker signature
+        const signature = request.headers['x-worker-signature'];
+        if (!signature) {
+            return reply.status(401).send({
+                type: 'https://api.renderowl.com/errors/unauthorized',
+                title: 'Unauthorized',
+                status: 401,
+                detail: 'Missing X-Worker-Signature header',
+                instance: '/v1/renders/webhooks/progress',
+            });
+        }
+        // Validate signature
+        const payload = JSON.stringify(request.body);
+        if (!validateWorkerSignature(payload, signature)) {
+            return reply.status(401).send({
+                type: 'https://api.renderowl.com/errors/invalid-signature',
+                title: 'Invalid Signature',
+                status: 401,
+                detail: 'Invalid worker signature',
+                instance: '/v1/renders/webhooks/progress',
+            });
+        }
         const { render_id, current_frame, status, error, output } = request.body;
+        // Validate render_id format
+        const renderIdValidation = RenderIdSchema.safeParse(render_id);
+        if (!renderIdValidation.success) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/invalid-id',
+                title: 'Invalid Render ID',
+                status: 400,
+                detail: `The render ID "${render_id}" is not valid`,
+                instance: '/v1/renders/webhooks/progress',
+            });
+        }
+        // Validate current_frame is non-negative
+        if (!Number.isInteger(current_frame) || current_frame < 0) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/validation-failed',
+                title: 'Validation Failed',
+                status: 400,
+                detail: 'current_frame must be a non-negative integer',
+                instance: '/v1/renders/webhooks/progress',
+            });
+        }
         const render = rendersStore.get(render_id);
         if (!render) {
             return reply.status(404).send({
@@ -452,23 +559,59 @@ export default async function renderRoutes(fastify, _opts) {
                 instance: '/v1/renders/webhooks/progress',
             });
         }
+        // Update total_frames if provided
+        if (request.body.total_frames !== undefined) {
+            if (!Number.isInteger(request.body.total_frames) || request.body.total_frames <= 0) {
+                return reply.status(400).send({
+                    type: 'https://api.renderowl.com/errors/validation-failed',
+                    title: 'Validation Failed',
+                    status: 400,
+                    detail: 'total_frames must be a positive integer',
+                    instance: '/v1/renders/webhooks/progress',
+                });
+            }
+            render.progress.total_frames = request.body.total_frames;
+        }
+        // Guard against division by zero
+        if (render.progress.total_frames === 0) {
+            return reply.status(400).send({
+                type: 'https://api.renderowl.com/errors/validation-failed',
+                title: 'Validation Failed',
+                status: 400,
+                detail: 'total_frames cannot be zero',
+                instance: '/v1/renders/webhooks/progress',
+            });
+        }
         // Update progress
-        render.progress.current_frame = current_frame;
-        render.progress.total_frames = request.body.total_frames || render.progress.total_frames;
-        render.progress.percent = Math.round((current_frame / render.progress.total_frames) * 100 * 10) / 10;
+        render.progress.current_frame = Math.min(current_frame, render.progress.total_frames);
+        render.progress.percent = Math.round((render.progress.current_frame / render.progress.total_frames) * 100 * 10) / 10;
         // Update status if provided
         if (status) {
             render.status = status;
             if (status === 'completed') {
                 render.completed_at = now();
                 if (output) {
+                    // Validate output URL
+                    if (output.url && !output.url.startsWith('https://')) {
+                        return reply.status(400).send({
+                            type: 'https://api.renderowl.com/errors/validation-failed',
+                            title: 'Validation Failed',
+                            status: 400,
+                            detail: 'output.url must be a valid HTTPS URL',
+                            instance: '/v1/renders/webhooks/progress',
+                        });
+                    }
                     render.output = output;
                 }
             }
             else if (status === 'failed') {
                 render.completed_at = now();
                 if (error) {
-                    render.error = error;
+                    render.error = {
+                        code: error.code || 'UNKNOWN_ERROR',
+                        message: error.message || 'Unknown error',
+                        details: error.details || null,
+                    };
                 }
             }
             else if (status === 'rendering' && !render.started_at) {
@@ -480,6 +623,6 @@ export default async function renderRoutes(fastify, _opts) {
         return reply.send({ success: true });
     });
 }
-// Export store for testing
+// Export store for asset reference checking
 export { rendersStore, projectRendersIndex };
 //# sourceMappingURL=renders.js.map

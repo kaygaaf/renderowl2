@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { RateLimiter, RateLimitResult } from '../lib/ratelimit/index.js';
+import { RateLimitResult } from '../lib/ratelimit/index.js';
 
 // ============================================================================
 // Enhanced Error Response System (RFC 7807 Problem Details)
@@ -196,9 +196,6 @@ export class RateLimitError extends ApiError {
 // ============================================================================
 
 export async function errorHandlerPlugin(fastify: FastifyInstance) {
-  // Store original error handler for fallback
-  const originalErrorHandler = fastify.errorHandler;
-
   fastify.setErrorHandler((error: any, request: FastifyRequest, reply: FastifyReply) => {
     const requestId = request.id;
     const instance = request.url;
