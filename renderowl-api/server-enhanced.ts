@@ -28,6 +28,8 @@ import stripeRoutes from './routes/stripe.js';
 import webhookRoutes from './routes/webhooks.js';
 import apiKeyRoutes from './routes/apikeys.js';
 import batchRoutes from './routes/batch.js';
+import batchJobRoutes from './routes/batch-jobs.js';
+import analyticsRoutes from './routes/analytics.js';
 import docsRoutes from './routes/docs.js';
 import integrationRoutes from './routes/integrations.js';
 import youtubeRoutes from './routes/youtube.js';
@@ -438,6 +440,8 @@ await fastify.register(
     await api.register(webhookRoutes, { prefix: '/webhooks' });
     await api.register(apiKeyRoutes, { prefix: '/user/api-keys' });
     await api.register(batchRoutes, { prefix: '/batch' });
+    await api.register(batchJobRoutes, { prefix: '/batch-jobs' });
+    await api.register(analyticsRoutes, { prefix: '/analytics' });
     await api.register(integrationRoutes, { prefix: '/integrations' });
     await api.register(youtubeRoutes, { prefix: '/youtube' });
     await api.register(rssRoutes, { prefix: '/rss' });
