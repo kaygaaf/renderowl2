@@ -118,13 +118,13 @@ export class AnalyticsService {
     // --------------------------------------------------------------------------
     getRenderStats(userId, projectId, fromDate, toDate) {
         let query = `
-      SELECT 
+      SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
         SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
-        AVG(CASE WHEN status = 'completed' THEN 
-          (julianday(completed_at) - julianday(started_at)) * 86400 
+        AVG(CASE WHEN status = 'completed' THEN
+          (julianday(completed_at) - julianday(started_at)) * 86400
           ELSE NULL END) as avg_duration,
         SUM(output_frames) as total_frames,
         SUM(credits_charged) as total_credits
@@ -161,7 +161,7 @@ export class AnalyticsService {
     getDailyStats(userId, days = 30) {
         // Clamp days to reasonable range to prevent abuse
         const clampedDays = Math.min(Math.max(days, 1), 365);
-        const results = this.db.query(`SELECT 
+        const results = this.db.query(`SELECT
         date,
         renders_total,
         renders_completed,
@@ -200,7 +200,7 @@ export class AnalyticsService {
         // If project-specific, query from renders table
         if (projectId) {
             const query = `
-        SELECT 
+        SELECT
           date(created_at) as date,
           COUNT(*) as value
         FROM renders
@@ -228,7 +228,7 @@ export class AnalyticsService {
         }));
     }
     getProjectComparison(userId) {
-        return this.db.query(`SELECT 
+        return this.db.query(`SELECT
         p.id as project_id,
         p.name as project_name,
         COUNT(r.id) as render_count,

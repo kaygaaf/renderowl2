@@ -127,12 +127,12 @@ export class CacheService extends EventEmitter {
         tags = excluded.tags,
         size = excluded.size,
         hits = 0
-    `).run(key, data, contentType, etag, now, expiresAt, tags, size);
+    `).run([key, data, contentType, etag, now, expiresAt, tags, size]);
         this.emit('cache:set', { key, size, expiresAt });
         return entry;
     }
     delete(key) {
-        const result = this.db.prepare('DELETE FROM cache_entries WHERE key = ?').run(key);
+        const result = this.db.prepare('DELETE FROM cache_entries WHERE key = ?').run([key]);
         if (result.changes > 0) {
             this.emit('cache:delete', { key });
             return true;
@@ -140,14 +140,14 @@ export class CacheService extends EventEmitter {
         return false;
     }
     invalidateByTag(tag) {
-        const result = this.db.prepare("DELETE FROM cache_entries WHERE tags LIKE ?").run(`%"${tag}"%`);
+        const result = this.db.prepare("DELETE FROM cache_entries WHERE tags LIKE ?").run([`%"${tag}"%`]);
         if (result.changes > 0) {
             this.emit('cache:invalidate', { tag, count: result.changes });
         }
         return result.changes;
     }
     invalidateByPattern(pattern) {
-        const result = this.db.prepare('DELETE FROM cache_entries WHERE key LIKE ?').run(`%${pattern}%`);
+        const result = this.db.prepare('DELETE FROM cache_entries WHERE key LIKE ?').run([`%${pattern}%`]);
         return result.changes;
     }
     clear() {

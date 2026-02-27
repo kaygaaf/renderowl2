@@ -161,7 +161,7 @@ export class YouTubeService extends EventEmitter {
         token_expires_at = excluded.token_expires_at,
         scope = excluded.scope,
         updated_at = excluded.updated_at
-    `).run(id, userId, channelId, channelTitle, accessToken, refreshToken, expiresAt, scope, now, now);
+    `).run([id, userId, channelId, channelTitle, accessToken, refreshToken, expiresAt, scope, now, now]);
         this.emit('connection:saved', { userId, channelId });
         return {
             id,
@@ -187,7 +187,7 @@ export class YouTubeService extends EventEmitter {
      * Delete connection
      */
     deleteConnection(userId) {
-        const result = this.db.prepare('DELETE FROM youtube_connections WHERE user_id = ?').run(userId);
+        const result = this.db.prepare('DELETE FROM youtube_connections WHERE user_id = ?').run([userId]);
         if (result.changes > 0) {
             this.emit('connection:deleted', { userId });
             return true;
@@ -224,7 +224,22 @@ export class YouTubeService extends EventEmitter {
         this.db.prepare(`
       INSERT INTO youtube_uploads (id, user_id, video_id, project_id, render_id, title, description, tags, category_id, privacy_status, playlist_id, scheduled_at, status, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(upload.id, upload.userId, upload.videoId, upload.projectId, upload.renderId, upload.title, upload.description, upload.tags ? JSON.stringify(upload.tags) : null, upload.categoryId, upload.privacyStatus, upload.playlistId, upload.scheduledAt, upload.status, upload.createdAt);
+    `).run([
+            upload.id,
+            upload.userId,
+            upload.videoId,
+            upload.projectId,
+            upload.renderId,
+            upload.title,
+            upload.description,
+            upload.tags ? JSON.stringify(upload.tags) : null,
+            upload.categoryId,
+            upload.privacyStatus,
+            upload.playlistId,
+            upload.scheduledAt,
+            upload.status,
+            upload.createdAt
+        ]);
         this.emit('upload:queued', { uploadId: id, userId: params.userId });
         return upload;
     }
@@ -276,7 +291,7 @@ export class YouTubeService extends EventEmitter {
             values.push(new Date().toISOString());
         }
         values.push(id);
-        const result = this.db.prepare(`UPDATE youtube_uploads SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        const result = this.db.prepare(`UPDATE youtube_uploads SET ${sets.join(', ')} WHERE id = ?`).run(values);
         if (result.changes > 0) {
             this.emit('upload:updated', { uploadId: id, status });
             return true;

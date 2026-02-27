@@ -209,7 +209,7 @@ export class RateLimiter extends EventEmitter {
       ON CONFLICT(key) DO UPDATE SET
         count = excluded.count,
         reset_at = excluded.reset_at
-    `).run(key, count, windowStart, resetAt);
+    `).run([key, count, windowStart, resetAt]);
     }
     estimateLimit(key) {
         // Extract tier from key (format: tier:identifier:timestamp)
@@ -228,14 +228,14 @@ export class RateLimiter extends EventEmitter {
         this.db.prepare(`
       INSERT INTO rate_limit_violations (id, key, tier, endpoint, timestamp, count_at_violation)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, key, tier, endpoint, timestamp, count);
+    `).run([id, key, tier, endpoint, timestamp, count]);
     }
     cleanup() {
         const now = Math.floor(Date.now() / 1000);
         // Delete expired windows (older than 1 hour)
-        const result = this.db.prepare('DELETE FROM rate_limit_windows WHERE reset_at < ?').run(now - 3600);
+        const result = this.db.prepare('DELETE FROM rate_limit_windows WHERE reset_at < ?').run([now - 3600]);
         // Delete old violations (older than 30 days)
-        this.db.prepare('DELETE FROM rate_limit_violations WHERE timestamp < ?').run(now - 2592000);
+        this.db.prepare('DELETE FROM rate_limit_violations WHERE timestamp < ?').run([now - 2592000]);
         if (result.changes > 0) {
             this.emit('cleanup', { deletedWindows: result.changes });
         }

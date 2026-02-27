@@ -136,7 +136,27 @@ export class TemplateService extends EventEmitter {
         composition, variables_schema, default_variables,
         width, height, fps, duration_seconds, status, visibility, version, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(template.id, template.userId, template.projectId, template.name, template.description, template.category, template.tags ? JSON.stringify(template.tags) : null, JSON.stringify(template.composition), JSON.stringify(template.variablesSchema), template.defaultVariables ? JSON.stringify(template.defaultVariables) : null, template.width, template.height, template.fps, template.durationSeconds, template.status, template.visibility, template.version, template.createdAt, template.updatedAt);
+    `).run([
+            template.id,
+            template.userId,
+            template.projectId,
+            template.name,
+            template.description,
+            template.category,
+            template.tags ? JSON.stringify(template.tags) : null,
+            JSON.stringify(template.composition),
+            JSON.stringify(template.variablesSchema),
+            template.defaultVariables ? JSON.stringify(template.defaultVariables) : null,
+            template.width,
+            template.height,
+            template.fps,
+            template.durationSeconds,
+            template.status,
+            template.visibility,
+            template.version,
+            template.createdAt,
+            template.updatedAt
+        ]);
         this.emit('template:created', { templateId: id, userId: params.userId });
         return template;
     }
@@ -215,7 +235,7 @@ export class TemplateService extends EventEmitter {
             values.push(updates.visibility);
         }
         values.push(id);
-        this.db.prepare(`UPDATE templates SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        this.db.prepare(`UPDATE templates SET ${sets.join(', ')} WHERE id = ?`).run(values);
         this.emit('template:updated', { templateId: id });
         return this.getTemplate(id);
     }
@@ -223,7 +243,7 @@ export class TemplateService extends EventEmitter {
      * Delete template
      */
     deleteTemplate(id) {
-        const result = this.db.prepare('DELETE FROM templates WHERE id = ?').run(id);
+        const result = this.db.prepare('DELETE FROM templates WHERE id = ?').run([id]);
         if (result.changes > 0) {
             this.emit('template:deleted', { templateId: id });
             return true;
@@ -234,13 +254,13 @@ export class TemplateService extends EventEmitter {
      * Increment render count
      */
     incrementRenderCount(id) {
-        this.db.prepare('UPDATE templates SET render_count = render_count + 1 WHERE id = ?').run(id);
+        this.db.prepare('UPDATE templates SET render_count = render_count + 1 WHERE id = ?').run([id]);
     }
     /**
      * Increment download count
      */
     incrementDownloadCount(id) {
-        this.db.prepare('UPDATE templates SET download_count = download_count + 1 WHERE id = ?').run(id);
+        this.db.prepare('UPDATE templates SET download_count = download_count + 1 WHERE id = ?').run([id]);
     }
     // ========================================================================
     // Marketplace
@@ -258,7 +278,14 @@ export class TemplateService extends EventEmitter {
         price_usd = excluded.price_usd,
         featured = excluded.featured,
         featured_at = CASE WHEN excluded.featured THEN datetime('now') ELSE featured_at END
-    `).run(id, params.templateId, params.priceCredits || 0, params.priceUsd || null, params.featured || false, params.featured ? new Date().toISOString() : null);
+    `).run([
+            id,
+            params.templateId,
+            params.priceCredits || 0,
+            params.priceUsd || null,
+            params.featured || false,
+            params.featured ? new Date().toISOString() : null
+        ]);
         const row = this.db.prepare('SELECT * FROM template_listings WHERE id = ?').get(id);
         return this.hydrateListing(row);
     }
@@ -372,7 +399,7 @@ export class TemplateService extends EventEmitter {
         rating = excluded.rating,
         review = excluded.review,
         created_at = excluded.created_at
-    `).run(id, params.templateId, params.userId, params.rating, params.review || null, now);
+    `).run([id, params.templateId, params.userId, params.rating, params.review || null, now]);
         // Update average rating
         this.updateRatingStats(params.templateId);
         this.emit('review:added', { templateId: params.templateId, userId: params.userId, rating: params.rating });
@@ -422,7 +449,7 @@ export class TemplateService extends EventEmitter {
         rating_count = ?,
         review_count = ?
       WHERE template_id = ?
-    `).run(stats.avg_rating || 0, stats.rating_count || 0, stats.review_count || 0, templateId);
+    `).run([stats.avg_rating || 0, stats.rating_count || 0, stats.review_count || 0, templateId]);
     }
     // ========================================================================
     // Private Methods
