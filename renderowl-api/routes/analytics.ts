@@ -182,7 +182,7 @@ export class AnalyticsService {
     storageBytes?: number;
   }): void {
     const id = `stats_${params.userId}_${params.date}`;
-    
+
     this.db.run(
       `INSERT INTO analytics_daily (
         id, user_id, date, renders_total, renders_completed, renders_failed, renders_cancelled,
@@ -198,9 +198,9 @@ export class AnalyticsService {
         credits_used = credits_used + COALESCE(excluded.credits_used, 0),
         storage_bytes_used = storage_bytes_used + COALESCE(excluded.storage_bytes_used, 0),
         updated_at = datetime('now')`,
-      [id, params.userId, params.date, params.rendersTotal || 0, params.rendersCompleted || 0, 
-       params.rendersFailed || 0, params.rendersCancelled || 0, params.durationSeconds || 0,
-       params.framesRendered || 0, params.creditsUsed || 0, params.storageBytes || 0]
+      [id, params.userId, params.date, params.rendersTotal || 0, params.rendersCompleted || 0,
+        params.rendersFailed || 0, params.rendersCancelled || 0, params.durationSeconds || 0,
+        params.framesRendered || 0, params.creditsUsed || 0, params.storageBytes || 0]
     );
   }
 
@@ -210,20 +210,20 @@ export class AnalyticsService {
 
   getRenderStats(userId: string, projectId?: string, fromDate?: string, toDate?: string): RenderStats {
     let query = `
-      SELECT 
+      SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
         SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
-        AVG(CASE WHEN status = 'completed' THEN 
-          (julianday(completed_at) - julianday(started_at)) * 86400 
+        AVG(CASE WHEN status = 'completed' THEN
+          (julianday(completed_at) - julianday(started_at)) * 86400
           ELSE NULL END) as avg_duration,
         SUM(output_frames) as total_frames,
         SUM(credits_charged) as total_credits
       FROM renders
       WHERE user_id = ?
     `;
-    
+
     const params: (string | number)[] = [userId];
 
     if (projectId) {
@@ -261,9 +261,9 @@ export class AnalyticsService {
   getDailyStats(userId: string, days: number = 30): DailyStats[] {
     // Clamp days to reasonable range to prevent abuse
     const clampedDays = Math.min(Math.max(days, 1), 365);
-    
+
     const results = this.db.query(
-      `SELECT 
+      `SELECT
         date,
         renders_total,
         renders_completed,
@@ -302,7 +302,7 @@ export class AnalyticsService {
     // Clamp days to reasonable range
     const clampedDays = Math.min(Math.max(days, 1), 365);
     const daysParam = `-${clampedDays} days`;
-    
+
     const metricColumn = {
       renders: 'renders_total',
       credits: 'credits_used',
@@ -313,7 +313,7 @@ export class AnalyticsService {
     // If project-specific, query from renders table
     if (projectId) {
       const query = `
-        SELECT 
+        SELECT
           date(created_at) as date,
           COUNT(*) as value
         FROM renders
@@ -323,7 +323,7 @@ export class AnalyticsService {
         GROUP BY date(created_at)
         ORDER BY date
       `;
-      
+
       const results = this.db.query(query, [userId, projectId, daysParam]) as any[];
       return results.map(r => ({
         timestamp: r.date,
@@ -355,7 +355,7 @@ export class AnalyticsService {
     totalCredits: number;
   }> {
     return this.db.query(
-      `SELECT 
+      `SELECT
         p.id as project_id,
         p.name as project_name,
         COUNT(r.id) as render_count,
@@ -400,9 +400,9 @@ export class AnalyticsService {
     this.db.run(
       `INSERT INTO notifications (id, user_id, type, title, message, data, read, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [notification.id, notification.userId, notification.type, notification.title, 
-       notification.message, notification.data ? JSON.stringify(notification.data) : null,
-       notification.read ? 1 : 0, notification.createdAt]
+      [notification.id, notification.userId, notification.type, notification.title,
+        notification.message, notification.data ? JSON.stringify(notification.data) : null,
+        notification.read ? 1 : 0, notification.createdAt]
     );
 
     return notification;
@@ -414,7 +414,7 @@ export class AnalyticsService {
       FROM notifications
       WHERE user_id = ?
     `;
-    
+
     const params: (string | number)[] = [userId];
 
     if (options?.unreadOnly) {
@@ -550,7 +550,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance, opts: an
     }
 
     const { metric = 'renders', days = '30', project_id } = request.query as any;
-    
+
     const validMetrics = ['renders', 'credits', 'frames', 'duration'];
     if (!validMetrics.includes(metric)) {
       return reply.status(400).send({ error: 'Invalid metric' });

@@ -147,7 +147,7 @@ export class RssService extends EventEmitter {
     this.db.prepare(`
       INSERT INTO rss_feeds (id, user_id, name, url, project_id, template_id, check_interval_minutes, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `).run([
       feed.id,
       feed.userId,
       feed.name,
@@ -157,7 +157,7 @@ export class RssService extends EventEmitter {
       feed.checkIntervalMinutes,
       feed.createdAt,
       feed.updatedAt
-    );
+    ]);
 
     this.emit('feed:created', { feedId: id, userId: params.userId, url: params.url });
 
@@ -231,7 +231,7 @@ export class RssService extends EventEmitter {
 
     values.push(id);
 
-    this.db.prepare(`UPDATE rss_feeds SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    this.db.prepare(`UPDATE rss_feeds SET ${sets.join(', ')} WHERE id = ?`).run(values);
 
     this.emit('feed:updated', { feedId: id });
 
@@ -242,7 +242,7 @@ export class RssService extends EventEmitter {
    * Delete feed
    */
   deleteFeed(id: string): boolean {
-    const result = this.db.prepare('DELETE FROM rss_feeds WHERE id = ?').run(id);
+    const result = this.db.prepare('DELETE FROM rss_feeds WHERE id = ?').run([id]);
     if (result.changes > 0) {
       this.emit('feed:deleted', { feedId: id });
       return true;
@@ -265,7 +265,7 @@ export class RssService extends EventEmitter {
           status = CASE WHEN error_count >= 4 THEN 'error' ELSE status END,
           updated_at = ?
         WHERE id = ?
-      `).run(now, error, now, id);
+      `).run([now, error, now, id]);
     } else {
       this.db.prepare(`
         UPDATE rss_feeds SET 
@@ -274,7 +274,7 @@ export class RssService extends EventEmitter {
           error_count = 0,
           updated_at = ?
         WHERE id = ?
-      `).run(now, now, id);
+      `).run([now, now, id]);
     }
   }
 
@@ -407,7 +407,7 @@ export class RssService extends EventEmitter {
     this.db.prepare(`
       INSERT INTO rss_items (id, feed_id, guid, title, description, content, link, published_at, author, image_url, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `).run([
       id,
       feedId,
       item.guid,
@@ -419,7 +419,7 @@ export class RssService extends EventEmitter {
       item.author || null,
       item.imageUrl || null,
       now
-    );
+    ]);
 
     return {
       id,
@@ -463,7 +463,7 @@ export class RssService extends EventEmitter {
   markItemProcessed(id: string, videoId: string, renderId: string): void {
     this.db.prepare(`
       UPDATE rss_items SET processed = 1, video_id = ?, render_id = ? WHERE id = ?
-    `).run(videoId, renderId, id);
+    `).run([videoId, renderId, id]);
   }
 
   /**

@@ -185,13 +185,12 @@ export class BatchJobService extends EventEmitter {
       createdAt: new Date().toISOString(),
     };
 
-    this.db.run(
+    this.db.prepare(
       `INSERT INTO batch_jobs (
         id, user_id, project_id, template_id, name, operations, total_jobs, priority, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [job.id, job.userId, job.projectId, job.templateId, job.name, 
-       JSON.stringify(job.operations), job.totalJobs, job.priority, job.createdAt]
-    );
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run([job.id, job.userId, job.projectId, job.templateId, job.name, 
+       JSON.stringify(job.operations), job.totalJobs, job.priority, job.createdAt]);
 
     // Create individual render job records
     const insertRenderJob = this.db.prepare(
@@ -201,12 +200,12 @@ export class BatchJobService extends EventEmitter {
 
     for (let i = 0; i < params.operations.length; i++) {
       const renderJobId = `brj_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 9)}`;
-      insertRenderJob.run(
+      insertRenderJob.run([
         renderJobId, 
         job.id, 
         i, 
         JSON.stringify(params.operations[i].variables)
-      );
+      ]);
     }
 
     this.emit('jobCreated', job);
@@ -308,12 +307,11 @@ export class BatchJobService extends EventEmitter {
   // --------------------------------------------------------------------------
 
   pauseBatchJob(jobId: string, userId: string): boolean {
-    const result = this.db.run(
+    const result = this.db.prepare(
       `UPDATE batch_jobs 
        SET status = 'paused', updated_at = datetime('now')
-       WHERE id = ? AND user_id = ? AND status = 'processing'`,
-      [jobId, userId]
-    );
+       WHERE id = ? AND user_id = ? AND status = 'processing'`
+    ).run([jobId, userId]);
 
     if (result.changes > 0) {
       this.emit('jobPaused', { jobId });
@@ -323,12 +321,11 @@ export class BatchJobService extends EventEmitter {
   }
 
   resumeBatchJob(jobId: string, userId: string): boolean {
-    const result = this.db.run(
+    const result = this.db.prepare(
       `UPDATE batch_jobs 
        SET status = 'pending', updated_at = datetime('now')
-       WHERE id = ? AND user_id = ? AND status = 'paused'`,
-      [jobId, userId]
-    );
+       WHERE id = ? AND user_id = ? AND status = 'paused'`
+    ).run([jobId, userId]);
 
     if (result.changes > 0) {
       this.emit('jobResumed', { jobId });
@@ -338,21 +335,19 @@ export class BatchJobService extends EventEmitter {
   }
 
   cancelBatchJob(jobId: string, userId: string): boolean {
-    const result = this.db.run(
+    const result = this.db.prepare(
       `UPDATE batch_jobs 
        SET status = 'cancelled', completed_at = datetime('now'), updated_at = datetime('now')
-       WHERE id = ? AND user_id = ? AND status IN ('pending', 'processing', 'paused')`,
-      [jobId, userId]
-    );
+       WHERE id = ? AND user_id = ? AND status IN ('pending', 'processing', 'paused')`
+    ).run([jobId, userId]);
 
     if (result.changes > 0) {
       // Cancel any pending render jobs
-      this.db.run(
+      this.db.prepare(
         `UPDATE batch_render_jobs 
          SET status = 'cancelled', completed_at = datetime('now')
-         WHERE batch_job_id = ? AND status IN ('pending', 'queued', 'processing')`,
-        [jobId]
-      );
+         WHERE batch_job_id = ? AND status IN ('pending', 'queued', 'processing')`
+      ).run([jobId]);
 
       this.emit('jobCancelled', { jobId });
       return true;
@@ -362,10 +357,9 @@ export class BatchJobService extends EventEmitter {
 
   deleteBatchJob(jobId: string, userId: string): boolean {
     // This will cascade delete batch_render_jobs
-    const result = this.db.run(
-      `DELETE FROM batch_jobs WHERE id = ? AND user_id = ?`,
-      [jobId, userId]
-    );
+    const result = this.db.prepare(
+      `DELETE FROM batch_jobs WHERE id = ? AND user_id = ?`
+    ).run([jobId, userId]);
 
     return result.changes > 0;
   }
@@ -417,12 +411,11 @@ export class BatchJobService extends EventEmitter {
 
     // Mark as processing if pending
     if (jobRow.status === 'pending') {
-      this.db.run(
+      this.db.prepare(
         `UPDATE batch_jobs 
          SET status = 'processing', started_at = datetime('now'), updated_at = datetime('now')
-         WHERE id = ?`,
-        [jobId]
-      );
+         WHERE id = ?`
+      ).run([jobId]);
     }
 
     // Get pending render jobs for this batch
@@ -446,13 +439,12 @@ export class BatchJobService extends EventEmitter {
       if (stats.total === stats.completed + stats.failed) {
         const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 100;
         
-        this.db.run(
+        this.db.prepare(
           `UPDATE batch_jobs 
            SET status = 'completed', completed_jobs = ?, failed_jobs = ?, 
                progress = ?, completed_at = datetime('now'), updated_at = datetime('now')
-           WHERE id = ?`,
-          [stats.completed, stats.failed, progress, jobId]
-        );
+           WHERE id = ?`
+        ).run([stats.completed, stats.failed, progress, jobId]);
 
         this.emit('jobCompleted', { jobId, completed: stats.completed, failed: stats.failed });
       }
@@ -477,12 +469,11 @@ export class BatchJobService extends EventEmitter {
       ? Math.round(((progressStats.completed + progressStats.failed) / progressStats.total) * 100) 
       : 0;
 
-    this.db.run(
+    this.db.prepare(
       `UPDATE batch_jobs 
        SET completed_jobs = ?, failed_jobs = ?, progress = ?, updated_at = datetime('now')
-       WHERE id = ?`,
-      [progressStats.completed, progressStats.failed, progress, jobId]
-    );
+       WHERE id = ?`
+    ).run([progressStats.completed, progressStats.failed, progress, jobId]);
 
     this.emit('jobProgress', { jobId, progress, completed: progressStats.completed, failed: progressStats.failed });
   }
@@ -490,10 +481,9 @@ export class BatchJobService extends EventEmitter {
   private async processRenderJob(renderJob: any, batchJob: any): Promise<void> {
     try {
       // Mark as queued
-      this.db.run(
-        `UPDATE batch_render_jobs SET status = 'queued' WHERE id = ?`,
-        [renderJob.id]
-      );
+      this.db.prepare(
+        `UPDATE batch_render_jobs SET status = 'queued' WHERE id = ?`
+      ).run([renderJob.id]);
 
       // Emit render request event - actual render job creation is handled by the main render service
       this.emit('renderRequest', {
@@ -506,12 +496,11 @@ export class BatchJobService extends EventEmitter {
       });
 
     } catch (error: any) {
-      this.db.run(
+      this.db.prepare(
         `UPDATE batch_render_jobs 
          SET status = 'failed', error_message = ?, completed_at = datetime('now')
-         WHERE id = ?`,
-        [error.message || 'Unknown error', renderJob.id]
-      );
+         WHERE id = ?`
+      ).run([error.message || 'Unknown error', renderJob.id]);
     }
   }
 
@@ -527,14 +516,15 @@ export class BatchJobService extends EventEmitter {
     creditsCharged?: number;
     outputUrl?: string;
   }): void {
-    this.db.run(
+    this.db.prepare(
       `UPDATE batch_render_jobs 
        SET render_job_id = ?, status = ?, error_message = ?, 
            credits_charged = ?, output_url = ?, completed_at = datetime('now')
-       WHERE id = ?`,
-      [params.renderJobId, params.status, params.errorMessage || null, 
-       params.creditsCharged || null, params.outputUrl || null, params.batchRenderJobId]
-    );
+       WHERE id = ?`
+    ).run([
+      params.renderJobId, params.status, params.errorMessage || null, 
+      params.creditsCharged || null, params.outputUrl || null, params.batchRenderJobId
+    ]);
   }
 
   // --------------------------------------------------------------------------
@@ -594,6 +584,11 @@ export class BatchJobService extends EventEmitter {
       estimatedCompletionAt: row.estimated_completion_at,
       createdAt: row.created_at,
     };
+  }
+
+  close(): void {
+    this.stopProcessingLoop();
+    this.db.close();
   }
 }
 
@@ -799,5 +794,3 @@ export default async function batchJobRoutes(fastify: FastifyInstance, opts: any
     return { stats };
   });
 }
-
-export { BatchJobService };

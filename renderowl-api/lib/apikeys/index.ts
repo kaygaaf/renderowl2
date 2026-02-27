@@ -222,7 +222,7 @@ export class ApiKeyService extends EventEmitter {
         id, user_id, name, key_hash, key_preview, scopes, status,
         expires_at, allowed_ips, allowed_origins, metadata, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `).run([
       apiKey.id,
       apiKey.userId,
       apiKey.name,
@@ -235,7 +235,7 @@ export class ApiKeyService extends EventEmitter {
       apiKey.allowedOrigins ? JSON.stringify(apiKey.allowedOrigins) : null,
       apiKey.metadata ? JSON.stringify(apiKey.metadata) : null,
       apiKey.createdAt
-    );
+    ]);
 
     this.emit('apikey:created', { apiKeyId: id, userId: params.userId });
 
@@ -307,12 +307,12 @@ export class ApiKeyService extends EventEmitter {
     this.db.prepare(`
       INSERT INTO api_key_usage (id, api_key_id, endpoint, method, ip_address, user_agent, timestamp, success, error_message)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, apiKeyId, endpoint, method, ipAddress || null, userAgent || null, timestamp, success, errorMessage || null);
+    `).run([id, apiKeyId, endpoint, method, ipAddress || null, userAgent || null, timestamp, success, errorMessage || null]);
 
     // Update last used and count
     this.db.prepare(`
       UPDATE api_keys SET last_used_at = datetime('now'), use_count = use_count + 1 WHERE id = ?
-    `).run(apiKeyId);
+    `).run([apiKeyId]);
   }
 
   /**
@@ -345,7 +345,7 @@ export class ApiKeyService extends EventEmitter {
         revoked_at = ?,
         revoked_reason = ?
       WHERE id = ? AND status = 'active'
-    `).run(now, reason || null, id);
+    `).run([now, reason || null, id]);
 
     if (result.changes > 0) {
       this.emit('apikey:revoked', { apiKeyId: id, reason });
@@ -393,7 +393,7 @@ export class ApiKeyService extends EventEmitter {
 
     values.push(id);
 
-    this.db.prepare(`UPDATE api_keys SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    this.db.prepare(`UPDATE api_keys SET ${sets.join(', ')} WHERE id = ?`).run(values);
 
     return this.getApiKey(id);
   }
@@ -471,7 +471,7 @@ export class ApiKeyService extends EventEmitter {
   }
 
   private expireApiKey(id: string): void {
-    this.db.prepare("UPDATE api_keys SET status = 'expired' WHERE id = ?").run(id);
+    this.db.prepare("UPDATE api_keys SET status = 'expired' WHERE id = ?").run([id]);
   }
 
   private hydrateApiKey(row: any): ApiKey {
