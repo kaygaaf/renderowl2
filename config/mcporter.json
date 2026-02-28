@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "coolify": {
+      "command": "/Users/minion/.openclaw/workspace/scripts/coolify-mcp.sh",
+      "args": []
+    },
+    "n8n-mcp": {
+      "command": "/Users/minion/.openclaw/workspace/scripts/n8n-mcp.sh"
+    },
+    "cloudflare-api": {
+      "baseUrl": "https://mcp.cloudflare.com/mcp",
+      "tokenCacheDir": "/Users/minion/.openclaw/workspace/.tokens/mcporter",
+      "clientName": "openclaw-kayorama",
+      "oauthRedirectUrl": "http://127.0.0.1:17171/callback",
+      "auth": "oauth"
+    },
+    "playwright-mcp": {
+      "command": "/Users/minion/.openclaw/workspace/scripts/playwright-mcp.sh",
+      "args": []
+    }
+  },
+  "imports": []
+}
