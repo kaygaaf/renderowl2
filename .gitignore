@@ -27,3 +27,19 @@ build/
 # Misc
 .DS_Store
 *.pem
+
+# Workspace organization files - keep local only
+00-READ_ME_FIRST.md
+ACCESS_REGISTRY.md
+CHEAT_SHEET.md
+ENVIRONMENT_COMPLETE.md
+INDEX.md
+QUICK_REFERENCE.md
+STARTUP.md
+WORKFLOW_AUTO.md
+AGENCY.md
+AGENCY_ARCHITECTURE.md
+MEMORY.md
+SKILLS.md
+memory/
+TOOLS/
