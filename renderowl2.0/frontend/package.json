@@ -53,5 +53,17 @@
     "tailwindcss": "^3.4.1",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "remotion": "4.0.430",
+    "@remotion/bundler": "4.0.430",
+    "@remotion/media-utils": "4.0.430",
+    "@remotion/player": "4.0.430",
+    "@remotion/renderer": "4.0.430",
+    "@remotion/studio": "4.0.430",
+    "@remotion/studio-server": "4.0.430",
+    "@remotion/studio-shared": "4.0.430",
+    "@remotion/web-renderer": "4.0.430",
+    "@remotion/zod-types": "4.0.430"
   }
 }
