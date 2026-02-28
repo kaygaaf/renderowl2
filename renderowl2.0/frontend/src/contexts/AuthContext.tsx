@@ -4,12 +4,12 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { timelineApi, setTokenGetter } from "@/lib/api"
 
 // Try to import Clerk, fallback to null if not available
-let useUser: any = null
-let useAuth: any = null
+let clerkUseUser: any = null
+let clerkUseAuth: any = null
 try {
   const clerk = require("@clerk/nextjs")
-  useUser = clerk.useUser
-  useAuth = clerk.useAuth
+  clerkUseUser = clerk.useUser
+  clerkUseAuth = clerk.useAuth
 } catch (e) {
   // Clerk not available
 }
@@ -56,8 +56,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Use Clerk hooks if available, otherwise fallback
-  const clerkUser = useUser ? useUser() : { user: null, isLoaded: true }
-  const clerkAuth = useAuth ? useAuth() : { isSignedIn: false, signOut: async () => {}, getToken: async () => null }
+  const clerkUser = clerkUseUser ? clerkUseUser() : { user: null, isLoaded: true }
+  const clerkAuth = clerkUseAuth ? clerkUseAuth() : { isSignedIn: false, signOut: async () => {}, getToken: async () => null }
   
   const { user, isLoaded } = clerkUser
   const { isSignedIn, signOut: clerkSignOut, getToken } = clerkAuth
