@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"renderowl-api/internal/service"
+	"renderowl-api/internal/domain"
 )
 
 // BatchRepository implements the batch repository interface
@@ -70,7 +70,7 @@ func NewBatchRepository(db *gorm.DB) *BatchRepository {
 }
 
 // Create creates a new batch
-func (r *BatchRepository) Create(batch *service.Batch) error {
+func (r *BatchRepository) Create(batch *domain.Batch) error {
 	// Serialize config
 	configJSON, err := json.Marshal(batch.Config)
 	if err != nil {
@@ -118,7 +118,7 @@ func (r *BatchRepository) Create(batch *service.Batch) error {
 }
 
 // createVideo creates a batch video
-func (r *BatchRepository) createVideo(video *service.BatchVideo) error {
+func (r *BatchRepository) createVideo(video *domain.BatchVideo) error {
 	configJSON, err := json.Marshal(video.Config)
 	if err != nil {
 		return err
@@ -153,7 +153,7 @@ func (r *BatchRepository) createVideo(video *service.BatchVideo) error {
 }
 
 // Get retrieves a batch by ID
-func (r *BatchRepository) Get(id string) (*service.Batch, error) {
+func (r *BatchRepository) Get(id string) (*domain.Batch, error) {
 	var model BatchModel
 	if err := r.db.Preload("Videos").First(&model, "id = ?", id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -166,7 +166,7 @@ func (r *BatchRepository) Get(id string) (*service.Batch, error) {
 }
 
 // Update updates a batch
-func (r *BatchRepository) Update(batch *service.Batch) error {
+func (r *BatchRepository) Update(batch *domain.Batch) error {
 	configJSON, err := json.Marshal(batch.Config)
 	if err != nil {
 		return err
@@ -211,7 +211,7 @@ func (r *BatchRepository) Update(batch *service.Batch) error {
 }
 
 // updateVideo updates a batch video
-func (r *BatchRepository) updateVideo(video *service.BatchVideo) error {
+func (r *BatchRepository) updateVideo(video *domain.BatchVideo) error {
 	configJSON, err := json.Marshal(video.Config)
 	if err != nil {
 		return err
@@ -245,7 +245,7 @@ func (r *BatchRepository) updateVideo(video *service.BatchVideo) error {
 }
 
 // List lists all batches for a user
-func (r *BatchRepository) List(userID string, limit, offset int) ([]*service.Batch, error) {
+func (r *BatchRepository) List(userID string, limit, offset int) ([]*domain.Batch, error) {
 	var models []BatchModel
 	if err := r.db.Where("user_id = ?", userID).
 		Order("created_at DESC").
@@ -256,7 +256,7 @@ func (r *BatchRepository) List(userID string, limit, offset int) ([]*service.Bat
 		return nil, err
 	}
 
-	var batches []*service.Batch
+	var batches []*domain.Batch
 	for _, model := range models {
 		batches = append(batches, r.toDomain(&model))
 	}
@@ -270,21 +270,21 @@ func (r *BatchRepository) Delete(id string) error {
 }
 
 // toDomain converts a model to domain object
-func (r *BatchRepository) toDomain(model *BatchModel) *service.Batch {
+func (r *BatchRepository) toDomain(model *BatchModel) *domain.Batch {
 	// Deserialize config
-	var config service.BatchConfig
+	var config domain.BatchConfig
 	json.Unmarshal([]byte(model.ConfigJSON), &config)
 
 	// Deserialize metadata
 	var metadata map[string]interface{}
 	json.Unmarshal([]byte(model.MetadataJSON), &metadata)
 
-	batch := &service.Batch{
+	batch := &domain.Batch{
 		ID:          model.ID,
 		UserID:      model.UserID,
 		Name:        model.Name,
 		Description: model.Description,
-		Status:      service.BatchStatus(model.Status),
+		Status:      domain.BatchStatus(model.Status),
 		TotalVideos: model.TotalVideos,
 		Completed:   model.Completed,
 		Failed:      model.Failed,
@@ -308,23 +308,23 @@ func (r *BatchRepository) toDomain(model *BatchModel) *service.Batch {
 }
 
 // videoToDomain converts a video model to domain object
-func (r *BatchRepository) videoToDomain(model *BatchVideoModel) *service.BatchVideo {
+func (r *BatchRepository) videoToDomain(model *BatchVideoModel) *domain.BatchVideo {
 	// Deserialize config
-	var config service.VideoConfig
+	var config domain.VideoConfig
 	json.Unmarshal([]byte(model.ConfigJSON), &config)
 
 	// Deserialize result
-	var result *service.VideoResult
+	var result *domain.VideoResult
 	if model.ResultJSON != "" {
 		json.Unmarshal([]byte(model.ResultJSON), &result)
 	}
 
-	return &service.BatchVideo{
+	return &domain.BatchVideo{
 		ID:          model.ID,
 		BatchID:     model.BatchID,
 		Title:       model.Title,
 		Description: model.Description,
-		Status:      service.VideoStatus(model.Status),
+		Status:      domain.VideoStatus(model.Status),
 		TimelineID:  model.TimelineID,
 		Error:       model.Error,
 		Progress:    model.Progress,
@@ -338,4 +338,4 @@ func (r *BatchRepository) videoToDomain(model *BatchVideoModel) *service.BatchVi
 }
 
 // Ensure BatchRepository implements the interface
-var _ service.BatchRepository = (*BatchRepository)(nil)
+var _ domain.BatchRepository = (*BatchRepository)(nil)

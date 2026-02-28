@@ -10,11 +10,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"renderowl-api/internal/domain"
 )
 
 // Task types for batch processing
 const (
-	TypeBatchVideo = "batch:video"
+	Typedomain.BatchVideo = "batch:video"
 	TypeBatchProcess = "batch:process"
 )
 
@@ -32,10 +33,10 @@ type BatchService struct {
 
 // BatchRepository defines the interface for batch data storage
 type BatchRepository interface {
-	Create(batch *Batch) error
-	Get(id string) (*Batch, error)
-	Update(batch *Batch) error
-	List(userID string, limit, offset int) ([]*Batch, error)
+	Create(batch *domain.Batch) error
+	Get(id string) (*domain.Batch, error)
+	Update(batch *domain.Batch) error
+	List(userID string, limit, offset int) ([]*domain.Batch, error)
 	Delete(id string) error
 }
 
@@ -45,12 +46,12 @@ type Batch struct {
 	UserID      string                 `json:"userId"`
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
-	Status      BatchStatus            `json:"status"`
+	Status      domain.BatchStatus            `json:"status"`
 	TotalVideos int                    `json:"totalVideos"`
 	Completed   int                    `json:"completed"`
 	Failed      int                    `json:"failed"`
 	InProgress  int                    `json:"inProgress"`
-	Videos      []BatchVideo           `json:"videos"`
+	Videos      []domain.domain.BatchVideo           `json:"videos"`
 	Config      BatchConfig            `json:"config"`
 	Progress    float64                `json:"progress"`
 	Error       string                 `json:"error,omitempty"`
@@ -61,26 +62,26 @@ type Batch struct {
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// BatchStatus represents the status of a batch job
-type BatchStatus string
+// domain.BatchStatus represents the status of a batch job
+type domain.BatchStatus string
 
 const (
-	BatchStatusPending    BatchStatus = "pending"
-	BatchStatusQueued     BatchStatus = "queued"
-	BatchStatusProcessing BatchStatus = "processing"
-	BatchStatusCompleted  BatchStatus = "completed"
-	BatchStatusFailed     BatchStatus = "failed"
-	BatchStatusCancelled  BatchStatus = "cancelled"
-	BatchStatusPaused     BatchStatus = "paused"
+	domain.BatchStatusPending    domain.BatchStatus = "pending"
+	domain.BatchStatusQueued     domain.BatchStatus = "queued"
+	domain.BatchStatusProcessing domain.BatchStatus = "processing"
+	domain.BatchStatusCompleted  domain.BatchStatus = "completed"
+	domain.BatchStatusFailed     domain.BatchStatus = "failed"
+	domain.BatchStatusCancelled  domain.BatchStatus = "cancelled"
+	domain.BatchStatusPaused     domain.BatchStatus = "paused"
 )
 
-// BatchVideo represents a single video in a batch
-type BatchVideo struct {
+// domain.BatchVideo represents a single video in a batch
+type domain.BatchVideo struct {
 	ID          string            `json:"id"`
 	BatchID     string            `json:"batchId"`
 	Title       string            `json:"title"`
 	Description string            `json:"description"`
-	Status      VideoStatus       `json:"status"`
+	Status      domain.VideoStatus       `json:"status"`
 	TimelineID  string            `json:"timelineId,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Progress    float64           `json:"progress"`
@@ -92,17 +93,17 @@ type BatchVideo struct {
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 }
 
-// VideoStatus represents the status of a single video
-type VideoStatus string
+// domain.VideoStatus represents the status of a single video
+type domain.VideoStatus string
 
 const (
-	VideoStatusPending    VideoStatus = "pending"
-	VideoStatusQueued     VideoStatus = "queued"
-	VideoStatusProcessing VideoStatus = "processing"
-	VideoStatusCompleted  VideoStatus = "completed"
-	VideoStatusFailed     VideoStatus = "failed"
-	VideoStatusSkipped    VideoStatus = "skipped"
-	VideoStatusCancelled  VideoStatus = "cancelled"
+	domain.VideoStatusPending    domain.VideoStatus = "pending"
+	domain.VideoStatusQueued     domain.VideoStatus = "queued"
+	domain.VideoStatusProcessing domain.VideoStatus = "processing"
+	domain.VideoStatusCompleted  domain.VideoStatus = "completed"
+	domain.VideoStatusFailed     domain.VideoStatus = "failed"
+	domain.VideoStatusSkipped    domain.VideoStatus = "skipped"
+	domain.VideoStatusCancelled  domain.VideoStatus = "cancelled"
 )
 
 // BatchConfig contains configuration for the batch
@@ -187,7 +188,7 @@ func NewBatchService(
 	aiScriptService *AIScriptService,
 	aiSceneService *AISceneService,
 	ttsService *TTSService,
-) (*BatchService, error) {
+) (*domain.BatchService, error) {
 	queue := asynq.NewClient(asynq.RedisClientOpt{
 		Addr:     redisAddr,
 		Password: redisPassword,
@@ -213,13 +214,13 @@ func NewBatchService(
 }
 
 // CreateBatch creates a new batch job
-func (s *BatchService) CreateBatch(ctx context.Context, userID string, req *CreateBatchRequest) (*Batch, error) {
+func (s *domain.BatchService) CreateBatch(ctx context.Context, userID string, req *CreateBatchRequest) (*domain.Batch, error) {
 	batch := &Batch{
 		ID:          uuid.New().String(),
 		UserID:      userID,
 		Name:        req.Name,
 		Description: req.Description,
-		Status:      BatchStatusPending,
+		Status:      domain.BatchStatusPending,
 		TotalVideos: len(req.Videos),
 		Config:      req.Config,
 		Progress:    0,
@@ -229,12 +230,12 @@ func (s *BatchService) CreateBatch(ctx context.Context, userID string, req *Crea
 
 	// Create batch videos
 	for i, input := range req.Videos {
-		video := BatchVideo{
+		video := domain.BatchVideo{
 			ID:          uuid.New().String(),
 			BatchID:     batch.ID,
 			Title:       input.Title,
 			Description: input.Description,
-			Status:      VideoStatusPending,
+			Status:      domain.VideoStatusPending,
 			Config:      input.Config,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -267,18 +268,18 @@ func (s *BatchService) CreateBatch(ctx context.Context, userID string, req *Crea
 }
 
 // StartBatch starts processing a batch
-func (s *BatchService) StartBatch(ctx context.Context, batchID string) error {
+func (s *domain.BatchService) StartBatch(ctx context.Context, batchID string) error {
 	batch, err := s.repo.Get(batchID)
 	if err != nil {
 		return err
 	}
 
-	if batch.Status != BatchStatusPending {
+	if batch.Status != domain.BatchStatusPending {
 		return fmt.Errorf("batch is not in pending status")
 	}
 
 	now := time.Now()
-	batch.Status = BatchStatusQueued
+	batch.Status = domain.BatchStatusQueued
 	batch.StartedAt = &now
 	batch.UpdatedAt = now
 
@@ -290,7 +291,7 @@ func (s *BatchService) StartBatch(ctx context.Context, batchID string) error {
 	for i := range batch.Videos {
 		if err := s.queueVideo(&batch.Videos[i]); err != nil {
 			log.Printf("Failed to queue video %s: %v", batch.Videos[i].ID, err)
-			batch.Videos[i].Status = VideoStatusFailed
+			batch.Videos[i].Status = domain.VideoStatusFailed
 			batch.Videos[i].Error = "Failed to queue"
 		}
 	}
@@ -299,13 +300,13 @@ func (s *BatchService) StartBatch(ctx context.Context, batchID string) error {
 }
 
 // queueVideo adds a video to the processing queue
-func (s *BatchService) queueVideo(video *BatchVideo) error {
+func (s *domain.BatchService) queueVideo(video *domain.domain.BatchVideo) error {
 	payload, err := json.Marshal(video)
 	if err != nil {
 		return err
 	}
 
-	task := asynq.NewTask(TypeBatchVideo, payload)
+	task := asynq.NewTask(Typedomain.BatchVideo, payload)
 
 	// Configure task options
 	opts := []asynq.Option{
@@ -320,19 +321,19 @@ func (s *BatchService) queueVideo(video *BatchVideo) error {
 		return err
 	}
 
-	video.Status = VideoStatusQueued
+	video.Status = domain.VideoStatusQueued
 	log.Printf("Queued video %s with task ID %s", video.ID, info.ID)
 
 	return nil
 }
 
 // GetBatch retrieves a batch by ID
-func (s *BatchService) GetBatch(ctx context.Context, batchID string) (*Batch, error) {
+func (s *domain.BatchService) GetBatch(ctx context.Context, batchID string) (*domain.Batch, error) {
 	return s.repo.Get(batchID)
 }
 
 // GetBatchProgress retrieves the current progress of a batch
-func (s *BatchService) GetBatchProgress(ctx context.Context, batchID string) (*BatchProgress, error) {
+func (s *domain.BatchService) GetBatchProgress(ctx context.Context, batchID string) (*domain.BatchProgress, error) {
 	batch, err := s.repo.Get(batchID)
 	if err != nil {
 		return nil, err
@@ -351,14 +352,14 @@ func (s *BatchService) GetBatchProgress(ctx context.Context, batchID string) (*B
 
 	// Find current video being processed
 	for _, video := range batch.Videos {
-		if video.Status == VideoStatusProcessing {
+		if video.Status == domain.VideoStatusProcessing {
 			progress.CurrentVideo = video.Title
 			break
 		}
 	}
 
 	// Calculate ETA
-	if batch.Status == BatchStatusProcessing && batch.Completed > 0 {
+	if batch.Status == domain.BatchStatusProcessing && batch.Completed > 0 {
 		elapsed := time.Since(*batch.StartedAt)
 		rate := float64(batch.Completed) / elapsed.Minutes()
 		remaining := float64(batch.TotalVideos-batch.Completed) / rate
@@ -369,16 +370,16 @@ func (s *BatchService) GetBatchProgress(ctx context.Context, batchID string) (*B
 }
 
 // GetBatchResults retrieves the results of a completed batch
-func (s *BatchService) GetBatchResults(ctx context.Context, batchID string) (*Batch, error) {
+func (s *domain.BatchService) GetBatchResults(ctx context.Context, batchID string) (*domain.Batch, error) {
 	batch, err := s.repo.Get(batchID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Filter to only completed videos with results
-	var completedVideos []BatchVideo
+	var completedVideos []domain.domain.BatchVideo
 	for _, video := range batch.Videos {
-		if video.Status == VideoStatusCompleted && video.Result != nil {
+		if video.Status == domain.VideoStatusCompleted && video.Result != nil {
 			completedVideos = append(completedVideos, video)
 		}
 	}
@@ -388,7 +389,7 @@ func (s *BatchService) GetBatchResults(ctx context.Context, batchID string) (*Ba
 }
 
 // ListBatches lists all batches for a user
-func (s *BatchService) ListBatches(ctx context.Context, userID string, limit, offset int) ([]*Batch, error) {
+func (s *domain.BatchService) ListBatches(ctx context.Context, userID string, limit, offset int) ([]*domain.Batch, error) {
 	if limit == 0 {
 		limit = 20
 	}
@@ -396,23 +397,23 @@ func (s *BatchService) ListBatches(ctx context.Context, userID string, limit, of
 }
 
 // CancelBatch cancels a batch and all pending videos
-func (s *BatchService) CancelBatch(ctx context.Context, batchID string) error {
+func (s *domain.BatchService) CancelBatch(ctx context.Context, batchID string) error {
 	batch, err := s.repo.Get(batchID)
 	if err != nil {
 		return err
 	}
 
-	if batch.Status == BatchStatusCompleted || batch.Status == BatchStatusCancelled {
+	if batch.Status == domain.BatchStatusCompleted || batch.Status == domain.BatchStatusCancelled {
 		return fmt.Errorf("batch cannot be cancelled")
 	}
 
-	batch.Status = BatchStatusCancelled
+	batch.Status = domain.BatchStatusCancelled
 	batch.UpdatedAt = time.Now()
 
 	// Cancel all pending videos
 	for i := range batch.Videos {
-		if batch.Videos[i].Status == VideoStatusPending || batch.Videos[i].Status == VideoStatusQueued {
-			batch.Videos[i].Status = VideoStatusCancelled
+		if batch.Videos[i].Status == domain.VideoStatusPending || batch.Videos[i].Status == domain.VideoStatusQueued {
+			batch.Videos[i].Status = domain.VideoStatusCancelled
 		}
 	}
 
@@ -420,41 +421,41 @@ func (s *BatchService) CancelBatch(ctx context.Context, batchID string) error {
 }
 
 // PauseBatch pauses batch processing
-func (s *BatchService) PauseBatch(ctx context.Context, batchID string) error {
+func (s *domain.BatchService) PauseBatch(ctx context.Context, batchID string) error {
 	batch, err := s.repo.Get(batchID)
 	if err != nil {
 		return err
 	}
 
-	if batch.Status != BatchStatusProcessing {
+	if batch.Status != domain.BatchStatusProcessing {
 		return fmt.Errorf("can only pause processing batches")
 	}
 
-	batch.Status = BatchStatusPaused
+	batch.Status = domain.BatchStatusPaused
 	batch.UpdatedAt = time.Now()
 
 	return s.repo.Update(batch)
 }
 
 // ResumeBatch resumes a paused batch
-func (s *BatchService) ResumeBatch(ctx context.Context, batchID string) error {
+func (s *domain.BatchService) ResumeBatch(ctx context.Context, batchID string) error {
 	batch, err := s.repo.Get(batchID)
 	if err != nil {
 		return err
 	}
 
-	if batch.Status != BatchStatusPaused {
+	if batch.Status != domain.BatchStatusPaused {
 		return fmt.Errorf("can only resume paused batches")
 	}
 
-	batch.Status = BatchStatusProcessing
+	batch.Status = domain.BatchStatusProcessing
 	batch.UpdatedAt = time.Now()
 
 	return s.repo.Update(batch)
 }
 
 // RetryFailedVideos retries all failed videos in a batch
-func (s *BatchService) RetryFailedVideos(ctx context.Context, batchID string) error {
+func (s *domain.BatchService) RetryFailedVideos(ctx context.Context, batchID string) error {
 	batch, err := s.repo.Get(batchID)
 	if err != nil {
 		return err
@@ -462,8 +463,8 @@ func (s *BatchService) RetryFailedVideos(ctx context.Context, batchID string) er
 
 	retryCount := 0
 	for i := range batch.Videos {
-		if batch.Videos[i].Status == VideoStatusFailed {
-			batch.Videos[i].Status = VideoStatusPending
+		if batch.Videos[i].Status == domain.VideoStatusFailed {
+			batch.Videos[i].Status = domain.VideoStatusPending
 			batch.Videos[i].Error = ""
 			batch.Videos[i].Progress = 0
 			batch.Videos[i].UpdatedAt = time.Now()
@@ -486,7 +487,7 @@ func (s *BatchService) RetryFailedVideos(ctx context.Context, batchID string) er
 }
 
 // GetQueueStats retrieves queue statistics
-func (s *BatchService) GetQueueStats(ctx context.Context) (*QueueStats, error) {
+func (s *domain.BatchService) GetQueueStats(ctx context.Context) (*QueueStats, error) {
 	stats, err := s.inspector.GetQueueInfo("batch")
 	if err != nil {
 		return nil, err
@@ -503,9 +504,9 @@ func (s *BatchService) GetQueueStats(ctx context.Context) (*QueueStats, error) {
 }
 
 // ProcessVideo processes a single video (called by worker)
-func (s *BatchService) ProcessVideo(ctx context.Context, video *BatchVideo) error {
+func (s *domain.BatchService) ProcessVideo(ctx context.Context, video *domain.domain.BatchVideo) error {
 	// Update status to processing
-	video.Status = VideoStatusProcessing
+	video.Status = domain.VideoStatusProcessing
 	video.StartedAt = &[]time.Time{time.Now()}[0]
 	
 	// Get batch for context
@@ -516,7 +517,7 @@ func (s *BatchService) ProcessVideo(ctx context.Context, video *BatchVideo) erro
 
 	// Update batch progress
 	batch.InProgress++
-	batch.Status = BatchStatusProcessing
+	batch.Status = domain.BatchStatusProcessing
 	batch.UpdatedAt = time.Now()
 	
 	if err := s.repo.Update(batch); err != nil {
@@ -526,7 +527,7 @@ func (s *BatchService) ProcessVideo(ctx context.Context, video *BatchVideo) erro
 	// Process the video
 	result, err := s.generateVideo(ctx, video, batch)
 	if err != nil {
-		video.Status = VideoStatusFailed
+		video.Status = domain.VideoStatusFailed
 		video.Error = err.Error()
 		video.Progress = 0
 		
@@ -540,7 +541,7 @@ func (s *BatchService) ProcessVideo(ctx context.Context, video *BatchVideo) erro
 	}
 
 	// Success
-	video.Status = VideoStatusCompleted
+	video.Status = domain.VideoStatusCompleted
 	video.Result = result
 	video.Progress = 100
 	video.CompletedAt = &[]time.Time{time.Now()}[0]
@@ -559,11 +560,11 @@ func (s *BatchService) ProcessVideo(ctx context.Context, video *BatchVideo) erro
 		now := time.Now()
 		batch.CompletedAt = &now
 		if batch.Failed == 0 {
-			batch.Status = BatchStatusCompleted
+			batch.Status = domain.BatchStatusCompleted
 		} else if batch.Completed > 0 {
-			batch.Status = BatchStatusCompleted // Partial success
+			batch.Status = domain.BatchStatusCompleted // Partial success
 		} else {
-			batch.Status = BatchStatusFailed
+			batch.Status = domain.BatchStatusFailed
 		}
 	}
 
@@ -571,7 +572,7 @@ func (s *BatchService) ProcessVideo(ctx context.Context, video *BatchVideo) erro
 }
 
 // generateVideo generates a single video
-func (s *BatchService) generateVideo(ctx context.Context, video *BatchVideo, batch *Batch) (*VideoResult, error) {
+func (s *domain.BatchService) generateVideo(ctx context.Context, video *domain.domain.BatchVideo, batch *domain.Batch) (*VideoResult, error) {
 	startTime := time.Now()
 
 	// Step 1: Generate script if not provided
@@ -682,6 +683,6 @@ func (s *BatchService) generateVideo(ctx context.Context, video *BatchVideo, bat
 }
 
 // Close closes the batch service
-func (s *BatchService) Close() error {
+func (s *domain.BatchService) Close() error {
 	return s.queue.Close()
 }

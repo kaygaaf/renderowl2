@@ -2,11 +2,7 @@ package social
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"time"
 
@@ -235,11 +231,11 @@ func (y *YouTubePlatform) GetAnalytics(ctx context.Context, account *social.Soci
 
 	return &social.AnalyticsData{
 		Platform:   social.PlatformYouTube,
-		Views:      stats.ViewCount,
-		Likes:      stats.LikeCount,
-		Comments:   stats.CommentCount,
+		Views:      int64(stats.ViewCount),
+		Likes:      int64(stats.LikeCount),
+		Comments:   int64(stats.CommentCount),
 		Data: social.JSON{
-			"favoriteCount": stats.FavoriteCount,
+			"favoriteCount": int64(stats.FavoriteCount),
 		},
 	}, nil
 }
