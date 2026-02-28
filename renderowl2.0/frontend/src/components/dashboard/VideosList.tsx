@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Plus, Search, Grid3X3, List, Filter, MoreVertical, Play, Edit, Trash2, Copy, Download } from "lucide-react"
+import { Plus, Search, Grid3X3, List, MoreVertical, Play, Edit, Trash2, Copy, Download, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,15 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-const videos = [
-  { id: "1", title: "Product Launch Promo", status: "completed", duration: 45, createdAt: "2024-02-20", views: 1234 },
-  { id: "2", title: "YouTube Intro 2024", status: "processing", duration: 12, createdAt: "2024-02-19", views: 0 },
-  { id: "3", title: "TikTok Tutorial", status: "draft", duration: 30, createdAt: "2024-02-18", views: 0 },
-  { id: "4", title: "Instagram Reel", status: "completed", duration: 15, createdAt: "2024-02-17", views: 567 },
-  { id: "5", title: "Company Overview", status: "completed", duration: 120, createdAt: "2024-02-15", views: 890 },
-  { id: "6", title: "App Demo", status: "failed", duration: 25, createdAt: "2024-02-14", views: 0 },
-]
+import { useProjects } from "@/contexts/AuthContext"
+import { timelineApi } from "@/lib/api"
 
 const filters = [
   { id: "all", label: "All Videos" },
@@ -50,12 +43,39 @@ export function VideosList() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [activeFilter, setActiveFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const { projects, projectsLoading, projectsError, refreshProjects } = useProjects()
 
-  const filteredVideos = videos.filter((video) => {
+  const filteredVideos = projects.filter((video) => {
     const matchesFilter = activeFilter === "all" || video.status === activeFilter
     const matchesSearch = video.title.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesFilter && matchesSearch
   })
+
+  const handleDelete = async (id: string) => {
+    try {
+      await timelineApi.delete(id)
+      await refreshProjects()
+    } catch (error) {
+      console.error("Failed to delete project:", error)
+    }
+  }
+
+  if (projectsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  if (projectsError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-red-600">{projectsError}</p>
+        <Button onClick={refreshProjects}>Retry</Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -99,9 +119,11 @@ export function VideosList() {
             </Button>
           </div>
           
-          <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-            <Plus className="mr-2 h-4 w-4" />
-            New Video
+          <Button className="bg-gradient-to-r from-blue-600 to-purple-600" asChild>
+            <Link href="/editor">
+              <Plus className="mr-2 h-4 w-4" />
+              New Video
+            </Link>
           </Button>
         </div>
       </div>
@@ -145,7 +167,10 @@ export function VideosList() {
                         <Download className="mr-2 h-4 w-4" /> Download
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-600">
+                      <DropdownMenuItem 
+                        className="text-red-600"
+                        onClick={() => handleDelete(video.id)}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -158,11 +183,9 @@ export function VideosList() {
                   <span>{video.duration}s</span>
                 </div>
                 
-                {video.status === "completed" && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {video.views.toLocaleString()} views
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground mt-2">
+                  {new Date(video.createdAt).toLocaleDateString()}
+                </p>
               </div>
             </div>
           ))}
@@ -176,7 +199,6 @@ export function VideosList() {
                 <th className="text-left p-4 font-medium">Status</th>
                 <th className="text-left p-4 font-medium">Duration</th>
                 <th className="text-left p-4 font-medium">Created</th>
-                <th className="text-left p-4 font-medium">Views</th>
                 <th className="text-left p-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -195,8 +217,7 @@ export function VideosList() {
                     <StatusBadge status={video.status} />
                   </td>
                   <td className="p-4">{video.duration}s</td>
-                  <td className="p-4">{video.createdAt}</td>
-                  <td className="p-4">{video.views.toLocaleString()}</td>
+                  <td className="p-4">{new Date(video.createdAt).toLocaleDateString()}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -221,7 +242,10 @@ export function VideosList() {
                             <Download className="mr-2 h-4 w-4" /> Download
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDelete(video.id)}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -239,9 +263,11 @@ export function VideosList() {
         <div className="text-center py-16">
           <div className="text-4xl mb-4">🎬</div>
           <h3 className="text-lg font-semibold mb-2">No videos found</h3>
-          <Button className="mt-4 bg-gradient-to-r from-blue-600 to-purple-600">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Your First Video
+          <Button className="mt-4 bg-gradient-to-r from-blue-600 to-purple-600" asChild>
+            <Link href="/editor">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Your First Video
+            </Link>
           </Button>
         </div>
       )}

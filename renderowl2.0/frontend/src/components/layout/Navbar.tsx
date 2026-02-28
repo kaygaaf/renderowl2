@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Film, Menu, X, Sparkles, ChevronDown } from "lucide-react"
+import { Film, Menu, X, Sparkles } from "lucide-react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -15,14 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-interface NavbarProps {
-  user?: {
-    name: string
-    email: string
-    avatar?: string
-  } | null
-}
+import { useAuth } from "@/contexts/AuthContext"
 
 const navLinks = [
   { href: "/features", label: "Features" },
@@ -30,11 +23,16 @@ const navLinks = [
   { href: "/pricing", label: "Pricing" },
 ]
 
-export function Navbar({ user }: NavbarProps) {
+export function Navbar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { isSignedIn, userData, signOut } = useAuth()
 
   const isLanding = pathname === "/"
+
+  const handleSignOut = async () => {
+    await signOut()
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -64,25 +62,25 @@ export function Navbar({ user }: NavbarProps) {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-4">
-          {user ? (
+          {isSignedIn ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={userData?.avatar} alt={userData?.name} />
+                    <AvatarFallback>{userData?.name?.charAt(0) || "U"}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <div className="flex items-center gap-2 p-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={userData?.avatar} alt={userData?.name} />
+                    <AvatarFallback>{userData?.name?.charAt(0) || "U"}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
-                    <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="text-sm font-medium">{userData?.name}</p>
+                    <p className="text-xs text-muted-foreground">{userData?.email}</p>
                   </div>
                 </div>
                 <DropdownMenuSeparator />
@@ -90,10 +88,10 @@ export function Navbar({ user }: NavbarProps) {
                   <Link href="/dashboard">Dashboard</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/settings">Settings</Link>
+                  <Link href="/dashboard/settings">Settings</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600">
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -142,7 +140,7 @@ export function Navbar({ user }: NavbarProps) {
                 </Link>
               ))}
               <hr className="border-border" />
-              {user ? (
+              {isSignedIn ? (
                 <>
                   <Link
                     href="/dashboard"
@@ -151,7 +149,13 @@ export function Navbar({ user }: NavbarProps) {
                   >
                     Dashboard
                   </Link>
-                  <button className="text-sm font-medium text-red-600 text-left">
+                  <button 
+                    className="text-sm font-medium text-red-600 text-left"
+                    onClick={() => {
+                      handleSignOut()
+                      setMobileMenuOpen(false)
+                    }}
+                  >
                     Sign out
                   </button>
                 </>

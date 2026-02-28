@@ -14,7 +14,7 @@ export default async function VideosPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar user={{ name: "User", email: "user@example.com" }} />
+      <Navbar />
       <div className="flex flex-1">
         <Sidebar />
         <main className="flex-1 ml-64 pt-16">

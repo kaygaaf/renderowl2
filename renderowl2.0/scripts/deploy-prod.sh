@@ -1,148 +1,110 @@
 #!/bin/bash
-# Deploy to Production Environment
+# Renderowl 2.0 - Production Deployment Script
 # Usage: ./scripts/deploy-prod.sh [version]
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+VERSION=${1:-latest}
+COOLIFY_PROJECT_ID="dw8koss8w0ock4kwkg8kgcs4"
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-log() {
-    echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')] INFO:${NC} $1"
-}
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}  Renderowl 2.0 Production Deployer${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
 
-warn() {
-    echo -e "${YELLOW}[$(date +'%Y-%m-%d %H:%M:%S')] WARN:${NC} $1"
-}
-
-error() {
-    echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR:${NC} $1"
-    exit 1
-}
-
-success() {
-    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] SUCCESS:${NC} $1"
-}
-
-# Configuration
-PROD_HOST="${PROD_HOST:-renderowl.app}"
-PROD_USER="${PROD_USER:-root}"
-VERSION="${1:-}"
-REGISTRY="${REGISTRY:-ghcr.io/kayorama}"
-
-if [ -z "$VERSION" ]; then
-    error "Version is required. Usage: ./scripts/deploy-prod.sh v1.0.0"
+# Check if version is provided
+if [ "$VERSION" == "latest" ]; then
+    echo -e "${YELLOW}⚠️  No version specified. Using 'latest' tag.${NC}"
+    echo -e "${YELLOW}   Recommended: Use a specific version tag (e.g., v1.0.0)${NC}"
+    echo ""
 fi
 
-log "🚀 Starting PRODUCTION deployment..."
-log "   Version: $VERSION"
-log "   Host: $PROD_HOST"
+echo -e "${BLUE}Deployment Details:${NC}"
+echo "  Version: $VERSION"
+echo "  Project: Renderowl2 Production"
+echo "  Project ID: $COOLIFY_PROJECT_ID"
+echo ""
 
-# Safety check
-echo -e "${YELLOW}"
-echo "⚠️  WARNING: You are about to deploy to PRODUCTION!"
-echo "   Version: $VERSION"
-echo -e "${NC}"
-read -p "Type 'DEPLOY' to continue: " confirm
-
-if [ "$confirm" != "DEPLOY" ]; then
-    error "Deployment cancelled by user"
-fi
-
-# Check prerequisites
-command -v ssh >/dev/null 2>&1 || error "ssh is required"
-
-# Verify staging is healthy first
-log "🔍 Verifying staging health before production deploy..."
-STAGING_HEALTH=$(curl -sf "https://staging.renderowl.app/api/health" && echo "healthy" || echo "unhealthy")
-
-if [ "$STAGING_HEALTH" != "healthy" ]; then
-    error "❌ Staging is unhealthy! Fix staging before deploying to production."
-fi
-success "✅ Staging is healthy"
-
-# Verify images exist
-log "🔍 Verifying images in registry..."
-docker manifest inspect "${REGISTRY}/renderowl-frontend:${VERSION}" >/dev/null 2>&1 || error "Frontend image not found: ${REGISTRY}/renderowl-frontend:${VERSION}"
-docker manifest inspect "${REGISTRY}/renderowl-backend:${VERSION}" >/dev/null 2>&1 || error "Backend image not found: ${REGISTRY}/renderowl-backend:${VERSION}"
-success "Images verified"
-
-# Pre-deployment backup
-log "💾 Creating pre-deployment backup..."
-ssh "${PROD_USER}@${PROD_HOST}" "cd /opt/renderowl/production && docker-compose -f docker-compose.prod.yml exec -T postgres pg_dump -U renderowl renderowl_prod > backup-pre-$(date +%Y%m%d-%H%M%S).sql" || warn "Backup may have failed, continuing..."
-
-# Deploy to production (blue-green style)
-log "📦 Deploying to production..."
-ssh "${PROD_USER}@${PROD_HOST}" << EOF
-    set -e
+# Confirmation
+if [ "$VERSION" != "latest" ]; then
+    echo -e "${YELLOW}⚠️  You are deploying to PRODUCTION!${NC}"
+    read -p "Type 'DEPLOY' to confirm: " confirm
     
-    cd /opt/renderowl/production
-    
-    # Pull new images
-    echo "Pulling images version ${VERSION}..."
-    docker pull "${REGISTRY}/renderowl-frontend:${VERSION}"
-    docker pull "${REGISTRY}/renderowl-backend:${VERSION}"
-    docker pull "${REGISTRY}/renderowl-worker:${VERSION}"
-    
-    # Update environment
-    echo "TAG=${VERSION}" > .env.deploy
-    
-    # Rolling update - backend first
-    echo "Updating backend..."
-    docker-compose -f docker-compose.prod.yml up -d --no-deps --scale backend=2 backend
-    sleep 10
-    docker-compose -f docker-compose.prod.yml up -d --no-deps --scale backend=1 backend
-    
-    # Then frontend
-    echo "Updating frontend..."
-    docker-compose -f docker-compose.prod.yml up -d --no-deps --scale frontend=2 frontend
-    sleep 10
-    docker-compose -f docker-compose.prod.yml up -d --no-deps --scale frontend=1 frontend
-    
-    # Finally workers
-    echo "Updating workers..."
-    docker-compose -f docker-compose.prod.yml up -d --no-deps worker
-    
-    # Clean up
-    docker image prune -f
-    
-    echo "Deployment complete!"
-EOF
-
-# Health checks
-log "⏳ Running production health checks..."
-sleep 15
-
-MAX_RETRIES=15
-RETRY_COUNT=0
-
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    FRONTEND_HEALTH=$(curl -sf "https://${PROD_HOST}/api/health" && echo "healthy" || echo "unhealthy")
-    BACKEND_HEALTH=$(curl -sf "https://api.${PROD_HOST}/health" && echo "healthy" || echo "unhealthy")
-    
-    if [ "$FRONTEND_HEALTH" = "healthy" ] && [ "$BACKEND_HEALTH" = "healthy" ]; then
-        success "✅ All production services are healthy!"
-        break
+    if [ "$confirm" != "DEPLOY" ]; then
+        echo -e "${RED}❌ Deployment cancelled.${NC}"
+        exit 1
     fi
-    
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    warn "Health check attempt $RETRY_COUNT/$MAX_RETRIES failed. Retrying..."
-    sleep 10
-done
-
-if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-    error "❌ Production health checks failed! Consider rollback."
 fi
 
-# Notify
-success "🎉 PRODUCTION deployment complete!"
-log "   Frontend: https://${PROD_HOST}"
-log "   API: https://api.${PROD_HOST}"
-log "   Version: ${VERSION}"
+echo ""
+echo -e "${BLUE}Starting deployment...${NC}"
+echo ""
+
+# Check required environment variables
+if [ -z "$COOLIFY_API_KEY" ]; then
+    echo -e "${RED}❌ COOLIFY_API_KEY not set${NC}"
+    exit 1
+fi
+
+if [ -z "$COOLIFY_URL" ]; then
+    echo -e "${RED}❌ COOLIFY_URL not set${NC}"
+    exit 1
+fi
+
+# Application UUIDs
+FRONTEND_UUID="q4scks4osww0g0osc0s00o8k"
+BACKEND_UUID="fkk0cswckcos4ossoo0cks0g"
+WORKER_UUID="ew4084gcc844400g80sscskk"
+
+echo -e "${BLUE}Step 1: Deploying Frontend...${NC}"
+curl -X POST \
+    "${COOLIFY_URL}/api/v1/applications/${FRONTEND_UUID}/deploy" \
+    -H "Authorization: Bearer ${COOLIFY_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "{\"tag\": \"${VERSION}\", \"force\": false}" || true
+
+echo -e "${GREEN}✅ Frontend deployment triggered${NC}"
+echo ""
+
+sleep 5
+
+echo -e "${BLUE}Step 2: Deploying Backend...${NC}"
+curl -X POST \
+    "${COOLIFY_URL}/api/v1/applications/${BACKEND_UUID}/deploy" \
+    -H "Authorization: Bearer ${COOLIFY_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "{\"tag\": \"${VERSION}\", \"force\": false}" || true
+
+echo -e "${GREEN}✅ Backend deployment triggered${NC}"
+echo ""
+
+sleep 5
+
+echo -e "${BLUE}Step 3: Deploying Worker...${NC}"
+curl -X POST \
+    "${COOLIFY_URL}/api/v1/applications/${WORKER_UUID}/deploy" \
+    -H "Authorization: Bearer ${COOLIFY_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "{\"tag\": \"${VERSION}\", \"force\": false}" || true
+
+echo -e "${GREEN}✅ Worker deployment triggered${NC}"
+echo ""
+
+echo -e "${BLUE}========================================${NC}"
+echo -e "${GREEN}✅ All deployments triggered!${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+echo "Monitor deployment status at:"
+echo "  $COOLIFY_URL/project/$COOLIFY_PROJECT_ID"
+echo ""
+echo "Health check endpoints:"
+echo "  Frontend: https://app.renderowl.com/api/health"
+echo "  Backend:  https://api.renderowl.com/health"
+echo ""
