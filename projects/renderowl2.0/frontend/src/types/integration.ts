@@ -3,8 +3,26 @@
  * Connects AI, Timeline, Templates, Assets, and Export
  */
 
-import { TimelineTrack, TimelineClip } from './timeline';
-import { CaptionSegment, CaptionStyle } from '@/lib/api-contract';
+import type { TimelineTrack, TimelineClip, CaptionStyle } from './timeline';
+
+// Re-export for convenience
+export type { TimelineTrack, TimelineClip, CaptionStyle };
+export type { TimelineState, TimelineActions } from './timeline';
+export type { HighlightMode, WordEntryAnimation } from './timeline';
+
+// Caption Segment (from api-contract)
+export interface WordTimestamp {
+  startMs: number;
+  endMs: number;
+  word: string;
+}
+
+export interface CaptionSegment {
+  startMs: number;
+  endMs: number;
+  text: string;
+  words?: WordTimestamp[];
+}
 
 // ============================================================================
 // AI Integration Types
@@ -290,4 +308,65 @@ export interface UserFlowState {
   templateId?: string;
   scriptId?: string;
   exportJobId?: string;
+}
+
+// ============================================================================
+// Upload Types
+// ============================================================================
+
+export interface UploadTask {
+  id: string;
+  file: File;
+  assetType: AssetType;
+  projectId: string;
+  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  asset?: Asset;
+  error?: string;
+}
+
+export interface AssetLibraryFilters {
+  type?: AssetType;
+  status?: AssetStatus;
+  search?: string;
+  tags?: string[];
+}
+
+// ============================================================================
+// Export Types
+// ============================================================================
+
+export interface RemotionComposition {
+  id: string;
+  durationInFrames: number;
+  fps: number;
+  width: number;
+  height: number;
+  videoSrc?: string;
+  captions: CaptionSegment[];
+  captionStyle: CaptionStyle;
+}
+
+export interface WebhookPayload {
+  event: 'queued' | 'started' | 'progress' | 'completed' | 'failed';
+  jobId: string;
+  timestamp: string;
+  data: Record<string, unknown>;
+}
+
+// ============================================================================
+// Orchestrator Types
+// ============================================================================
+
+export interface ProjectContext {
+  projectId: string;
+  timelineId: string;
+  userId: string;
+}
+
+export interface EditorState {
+  tracks: TimelineTrack[];
+  captionStyle: CaptionStyle;
+  currentTime: number;
+  totalDuration: number;
 }

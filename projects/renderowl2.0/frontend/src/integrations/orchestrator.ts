@@ -312,7 +312,7 @@ class IntegrationOrchestrator {
       trackId,
     });
 
-    return selectedAsset as Asset;
+    return selectedAsset as unknown as Asset;
   }
 
   /**

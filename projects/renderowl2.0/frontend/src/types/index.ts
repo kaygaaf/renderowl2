@@ -3,18 +3,7 @@
  * Central type definitions for Renderowl 2.0
  */
 
-// Timeline types
-export type {
-  TimelineClip,
-  TimelineTrack,
-  TimelineState,
-  TimelineActions,
-  CaptionStyle,
-  HighlightMode,
-  WordEntryAnimation,
-} from './timeline';
-
-// Integration types
+// All types exported from integration.ts (which includes timeline types)
 export type {
   // AI
   AIScriptScene,
@@ -22,6 +11,8 @@ export type {
   AIVoiceover,
   AIGeneratedAsset,
   AIGenerationRequest,
+  WordTimestamp,
+  CaptionSegment,
   
   // Templates
   Template,
@@ -36,6 +27,8 @@ export type {
   AssetStatus,
   AssetUploadRequest,
   AssetUploadResponse,
+  UploadTask,
+  AssetLibraryFilters,
   
   // Export
   ExportFormat,
@@ -44,13 +37,24 @@ export type {
   ExportSettings,
   ExportJob,
   ExportRequest,
+  RemotionComposition,
+  WebhookPayload,
   
   // User Flow
   UserFlowStep,
   UserFlowState,
-  
-  // Events
-  IntegrationEventType,
+  ProjectContext,
+  EditorState,
   IntegrationEvent,
+  IntegrationEventType,
   IntegrationEventHandler,
+  
+  // Timeline
+  TimelineClip,
+  TimelineTrack,
+  TimelineState,
+  TimelineActions,
+  CaptionStyle,
+  HighlightMode,
+  WordEntryAnimation,
 } from './integration';

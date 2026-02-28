@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   BarChart3,
+  Share2,
 } from "lucide-react"
 import { useState } from "react"
 
@@ -26,6 +27,7 @@ interface SidebarProps {
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "My Videos", href: "/dashboard/videos", icon: Film },
+  { name: "Social", href: "/dashboard/social", icon: Share2 },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Templates", href: "/templates", icon: Wand2 },
   { name: "Billing", href: "/dashboard/billing", icon: CreditCard },

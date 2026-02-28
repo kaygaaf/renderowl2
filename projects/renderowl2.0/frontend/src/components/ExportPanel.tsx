@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useExport, getAllExportPresets } from '@/integrations/export';
+import { useExport, getAllExportPresets, getExportPreset } from '@/integrations/export';
 import { useTimelineStore } from '@/store/timelineStore';
 import { Download, Loader2, Check, AlertCircle, Film, FileVideo } from 'lucide-react';
 
@@ -25,35 +25,12 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   const handleExport = async () => {
     setDownloadUrl(null);
 
-    // Build editor state from current timeline
-    const editorState = {
-      tracks,
-      captionStyle: {
-        fontSize: 64,
-        textColor: '#FFFFFF',
-        highlightColor: '#FFD54A',
-        highlightMode: 'fill' as const,
-      },
-      currentTime: 0,
-      totalDuration: tracks.reduce((max, track) => {
-        const trackEnd = track.clips.reduce((end, clip) => 
-          Math.max(end, clip.startTime + clip.duration), 0
-        );
-        return Math.max(max, trackEnd);
-      }, 0),
-    };
-
     try {
-      const context = {
-        projectId: 'temp-project',
-        timelineId,
-        userId: 'temp-user',
-      };
-
-      const job = await startExport(editorState, selectedPreset, context);
+      const settings = getExportPreset(selectedPreset);
       
-      // Wait for completion
-      // This is handled by the useExport hook polling
+      const job = await startExport(timelineId, settings);
+
+      // Wait for completion - handled by the useExport hook polling
     } catch (err) {
       console.error('Export failed:', err);
     }

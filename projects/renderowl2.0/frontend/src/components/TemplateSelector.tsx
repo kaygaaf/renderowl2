@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTemplates, BUILT_IN_TEMPLATES, Template } from '@/integrations/templates';
+import { useTemplates, BUILT_IN_TEMPLATES } from '@/integrations';
+import type { Template } from '@/types';
 import { Check, Sparkles, Lock } from 'lucide-react';
 
 interface TemplateSelectorProps {

@@ -640,3 +640,6 @@ export function useAssetLibrary(projectId: string) {
     updateAsset,
   };
 }
+
+// Re-export types from @/types for convenience
+export type { Asset, AssetType, AssetStatus, AssetUploadRequest, AssetUploadResponse } from '@/types';

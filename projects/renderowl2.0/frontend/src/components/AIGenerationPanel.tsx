@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useIntegration, AVAILABLE_VOICES } from '@/integrations';
-import { AIScript, AIGenerationRequest } from '@/integrations/ai';
+import type { AIScript, AIGenerationRequest } from '@/types';
 import { Loader2, Wand2, Mic, Image, Video, Clock, Users } from 'lucide-react';
 
 interface AIGenerationPanelProps {

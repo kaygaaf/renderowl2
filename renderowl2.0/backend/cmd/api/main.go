@@ -84,6 +84,25 @@ func main() {
 	ttsService := service.NewTTSService()
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
 
+	// Initialize Content Factory services
+	batchRepo := repository.NewBatchRepository(db)
+	ideationService := service.NewIdeationService()
+	batchService, err := service.NewBatchService(
+		batchRepo,
+		redisAddr,
+		os.Getenv("REDIS_PASSWORD"),
+		timelineService,
+		aiScriptService,
+		aiSceneService,
+		ttsService,
+	)
+	if err != nil {
+		log.Fatalf("Failed to initialize batch service: %v", err)
+	}
+	defer batchService.Close()
+	variationsService := service.NewVariationsService(nil) // Storage provider would be initialized here
+	optimizerService := service.NewOptimizerService(analyticsRepo, timelineRepo, socialService, aiScriptService)
+
 	// Initialize handlers
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
 	clipHandler := handlers.NewClipHandler(clipService)
@@ -93,6 +112,12 @@ func main() {
 	aiHandler := handlers.NewAIHandler(aiScriptService, aiSceneService, ttsService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	socialHandler := socialhandlers.NewSocialHandler(socialService, publisher, sched)
+	contentFactoryHandler := handlers.NewContentFactoryHandler(
+		ideationService,
+		batchService,
+		variationsService,
+		optimizerService,
+	)
 
 	// Setup router
 	r := gin.Default()
@@ -179,6 +204,32 @@ func main() {
 		api.GET("/social/analytics/:accountId", socialHandler.GetAnalytics)
 		api.GET("/social/trends/:accountId", socialHandler.GetTrends)
 		api.GET("/social/stats", socialHandler.GetQueueStats)
+
+		// Content Factory - Ideation endpoints
+		api.POST("/ideation/topics", contentFactoryHandler.GetTrendingTopics)
+		api.POST("/ideation/suggestions", contentFactoryHandler.GetContentSuggestions)
+		api.POST("/ideation/competitor-analysis", contentFactoryHandler.AnalyzeCompetitor)
+		api.POST("/ideation/calendar", contentFactoryHandler.GenerateContentCalendar)
+
+		// Content Factory - Batch endpoints
+		api.GET("/batch", contentFactoryHandler.ListBatches)
+		api.POST("/batch/generate", contentFactoryHandler.CreateBatch)
+		api.POST("/batch/:id/start", contentFactoryHandler.StartBatch)
+		api.GET("/batch/:id/status", contentFactoryHandler.GetBatchStatus)
+		api.GET("/batch/:id/results", contentFactoryHandler.GetBatchResults)
+		api.POST("/batch/:id/cancel", contentFactoryHandler.CancelBatch)
+		api.POST("/batch/:id/retry", contentFactoryHandler.RetryFailedVideos)
+		api.GET("/batch/queue/stats", contentFactoryHandler.GetQueueStats)
+
+		// Content Factory - Variations endpoints
+		api.POST("/variations/create", contentFactoryHandler.CreateVariations)
+		api.GET("/variations/platforms", contentFactoryHandler.GetPlatformSpecs)
+
+		// Content Factory - Optimizer endpoints
+		api.POST("/optimizer/analyze", contentFactoryHandler.AnalyzeVideo)
+		api.POST("/optimizer/report", contentFactoryHandler.GeneratePerformanceReport)
+		api.GET("/optimizer/winning-content", contentFactoryHandler.GetWinningContent)
+		api.POST("/optimizer/auto-title", contentFactoryHandler.AutoOptimizeTitle)
 	}
 
 	// Start server
@@ -198,6 +249,9 @@ func migrateDB(db *gorm.DB) error {
 		&repository.ClipModel{},
 		&repository.TrackModel{},
 		&repository.TemplateModel{},
+		// Batch models
+		&repository.BatchModel{},
+		&repository.BatchVideoModel{},
 		// Analytics models
 		&domain.AnalyticsView{},
 		&domain.AnalyticsEngagement{},
