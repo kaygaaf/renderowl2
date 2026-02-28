@@ -11,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/kaygaaf/renderowl2/internal/auth"
+	"github.com/kaygaaf/renderowl2/internal/domain"
 	"github.com/kaygaaf/renderowl2/internal/handlers"
 	"github.com/kaygaaf/renderowl2/internal/repository"
 	"github.com/kaygaaf/renderowl2/internal/service"
@@ -43,17 +45,26 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	// Get Clerk secret key
+	clerkSecretKey := os.Getenv("CLERK_SECRET_KEY")
+	if clerkSecretKey == "" {
+		log.Println("⚠️  Warning: CLERK_SECRET_KEY not set, auth will be disabled")
+	}
+
 	// Initialize repositories
 	timelineRepo := repository.NewTimelineRepository(db)
+	userRepo := repository.NewUserRepository(db)
 
 	// Initialize services
 	timelineService := service.NewTimelineService(timelineRepo)
+	userService := service.NewUserService(userRepo)
 
 	// Initialize handlers
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
+	authHandler := handlers.NewAuthHandler(userService)
 
 	// Setup router
-	router := setupRouter(timelineHandler)
+	router := setupRouter(timelineHandler, authHandler, clerkSecretKey)
 
 	// Get port from environment
 	port := os.Getenv("PORT")
@@ -121,15 +132,16 @@ func initDB() (*gorm.DB, error) {
 
 // migrateDB runs auto-migration for all models
 func migrateDB(db *gorm.DB) error {
-	// Import domain models for migration
-	// This will be expanded as we add more models
 	return db.AutoMigrate(
-		// Timeline models will be added here
+		&domain.User{},
+		&domain.Timeline{},
+		&domain.Track{},
+		&domain.Clip{},
 	)
 }
 
 // setupRouter configures the Gin router and routes
-func setupRouter(timelineHandler *handlers.TimelineHandler) *gin.Engine {
+func setupRouter(timelineHandler *handlers.TimelineHandler, authHandler *handlers.AuthHandler, clerkSecretKey string) *gin.Engine {
 	router := gin.New()
 
 	// Middleware
@@ -137,19 +149,33 @@ func setupRouter(timelineHandler *handlers.TimelineHandler) *gin.Engine {
 	router.Use(gin.Recovery())
 	router.Use(corsMiddleware())
 
+	// Clerk auth middleware (if configured)
+	if clerkSecretKey != "" {
+		router.Use(auth.ClerkAuthMiddleware(clerkSecretKey))
+	}
+
 	// Health check
 	router.GET("/health", healthCheck)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// Timeline routes
-		v1.POST("/timeline", timelineHandler.CreateTimeline)
-		v1.GET("/timeline/:id", timelineHandler.GetTimeline)
-		v1.PUT("/timeline/:id", timelineHandler.UpdateTimeline)
-		v1.DELETE("/timeline/:id", timelineHandler.DeleteTimeline)
-		v1.GET("/timelines", timelineHandler.ListTimelines)
-		v1.GET("/timelines/me", timelineHandler.GetUserTimelines)
+		// Auth routes
+		v1.POST("/auth/sync", authHandler.SyncUser)
+		v1.GET("/auth/me", authHandler.GetMe)
+		v1.GET("/auth/credits", authHandler.GetCredits)
+
+		// Timeline routes (protected)
+		timeline := v1.Group("/")
+		timeline.Use(auth.RequireAuth())
+		{
+			timeline.POST("/timeline", timelineHandler.CreateTimeline)
+			timeline.GET("/timeline/:id", timelineHandler.GetTimeline)
+			timeline.PUT("/timeline/:id", timelineHandler.UpdateTimeline)
+			timeline.DELETE("/timeline/:id", timelineHandler.DeleteTimeline)
+			timeline.GET("/timelines", timelineHandler.ListTimelines)
+			timeline.GET("/timelines/me", timelineHandler.GetUserTimelines)
+		}
 	}
 
 	return router
@@ -168,7 +194,18 @@ func healthCheck(c *gin.Context) {
 // corsMiddleware handles CORS
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+		
+		// Get allowed origins from env
+		allowedOrigins := getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+		
+		// Check if origin is allowed
+		if origin != "" && (allowedOrigins == "*" || contains(allowedOrigins, origin)) {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		} else {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+		
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
 		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
@@ -180,6 +217,21 @@ func corsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// contains checks if a string contains a substring
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || findInString(s, substr)))
+}
+
+// findInString checks if substr exists in s
+func findInString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // getEnv gets an environment variable with a default value

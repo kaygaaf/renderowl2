@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kaygaaf/renderowl2/internal/auth"
 	"github.com/kaygaaf/renderowl2/internal/domain"
 	"github.com/kaygaaf/renderowl2/internal/service"
 )
@@ -28,6 +29,7 @@ func NewTimelineHandler(service service.TimelineService) *TimelineHandler {
 // @Param timeline body domain.CreateTimelineRequest true "Timeline data"
 // @Success 201 {object} domain.TimelineResponse
 // @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/timeline [post]
 func (h *TimelineHandler) CreateTimeline(c *gin.Context) {
@@ -37,8 +39,12 @@ func (h *TimelineHandler) CreateTimeline(c *gin.Context) {
 		return
 	}
 
-	// TODO: Get userID from authenticated context
-	userID := uint(1) // Placeholder - should come from JWT/auth middleware
+	// Get userID from authenticated context
+	userID := auth.GetAuthUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
 
 	timeline, err := h.service.Create(c.Request.Context(), userID, req)
 	if err != nil {
@@ -57,6 +63,7 @@ func (h *TimelineHandler) CreateTimeline(c *gin.Context) {
 // @Param id path int true "Timeline ID"
 // @Success 200 {object} domain.TimelineResponse
 // @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/timeline/{id} [get]
@@ -109,8 +116,12 @@ func (h *TimelineHandler) UpdateTimeline(c *gin.Context) {
 		return
 	}
 
-	// TODO: Get userID from authenticated context
-	userID := uint(1) // Placeholder - should come from JWT/auth middleware
+	// Get userID from authenticated context
+	userID := auth.GetAuthUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
 
 	timeline, err := h.service.Update(c.Request.Context(), uint(id), userID, req)
 	if err != nil {
@@ -147,8 +158,12 @@ func (h *TimelineHandler) DeleteTimeline(c *gin.Context) {
 		return
 	}
 
-	// TODO: Get userID from authenticated context
-	userID := uint(1) // Placeholder - should come from JWT/auth middleware
+	// Get userID from authenticated context
+	userID := auth.GetAuthUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
 
 	if err := h.service.Delete(c.Request.Context(), uint(id), userID); err != nil {
 		switch err.Error() {
@@ -173,6 +188,7 @@ func (h *TimelineHandler) DeleteTimeline(c *gin.Context) {
 // @Param limit query int false "Limit (default 20)"
 // @Param offset query int false "Offset (default 0)"
 // @Success 200 {array} domain.TimelineResponse
+// @Failure 401 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/timelines [get]
 func (h *TimelineHandler) ListTimelines(c *gin.Context) {
@@ -190,27 +206,50 @@ func (h *TimelineHandler) ListTimelines(c *gin.Context) {
 		offset = 0
 	}
 
-	// TODO: Get userID from authenticated context and filter by user
-	timelines, err := h.service.List(c.Request.Context(), limit, offset)
+	// Get userID from authenticated context
+	userID := auth.GetAuthUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	// Get timelines for this user
+	timelines, err := h.service.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, service.ToResponseList(timelines))
+	// Apply pagination
+	start := offset
+	if start > len(timelines) {
+		start = len(timelines)
+	}
+	end := start + limit
+	if end > len(timelines) {
+		end = len(timelines)
+	}
+	paginatedTimelines := timelines[start:end]
+
+	c.JSON(http.StatusOK, service.ToResponseList(paginatedTimelines))
 }
 
 // GetUserTimelines gets all timelines for a specific user
 // @Summary Get user timelines
-// @Description Get all timelines for a specific user
+// @Description Get all timelines for the authenticated user
 // @Tags timelines
 // @Produce json
 // @Success 200 {array} domain.TimelineResponse
+// @Failure 401 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/timelines/me [get]
 func (h *TimelineHandler) GetUserTimelines(c *gin.Context) {
-	// TODO: Get userID from authenticated context
-	userID := uint(1) // Placeholder - should come from JWT/auth middleware
+	// Get userID from authenticated context
+	userID := auth.GetAuthUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
 
 	timelines, err := h.service.GetByUserID(c.Request.Context(), userID)
 	if err != nil {

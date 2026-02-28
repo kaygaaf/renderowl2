@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useState, useCallback, useEffect } from 'react'
-import { Player } from '@remotion/player'
+import { Player, PlayerRef } from '@remotion/player'
 import { VideoComposition, DefaultComposition } from '@/remotion/Composition'
 import type { TimelineData } from '@/remotion/types'
 import {
@@ -119,16 +119,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleVolumeChange = useCallback((value: number[]) => {
     const newVolume = value[0] / 100
     setVolume(newVolume)
-    if (playerRef.current) {
-      playerRef.current.setVolume(newVolume)
-    }
   }, [])
 
   const handleToggleMute = useCallback(() => {
     setIsMuted(!isMuted)
-    if (playerRef.current) {
-      playerRef.current.setMuted(!isMuted)
-    }
   }, [isMuted])
 
   const handleFullscreen = useCallback(() => {
@@ -155,7 +149,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <div className="relative flex-1 min-h-0 bg-black">
         <Player
           ref={playerRef}
-          component={timeline ? VideoComposition : DefaultComposition}
+          component={(timeline ? VideoComposition : DefaultComposition) as React.FC<{}>}
           inputProps={{ timeline }}
           durationInFrames={durationInFrames}
           fps={fps}
@@ -168,18 +162,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           controls={false}
           autoPlay={false}
           loop={false}
-          muted={isMuted}
-          volume={volume}
-          playbackRate={playbackRate}
-          onFrameUpdate={handleFrameUpdate}
-          onPause={() => {
-            setIsPlaying(false)
-            onPlayingChange?.(false)
-          }}
-          onPlay={() => {
-            setIsPlaying(true)
-            onPlayingChange?.(true)
-          }}
           allowFullscreen={true}
           clickToPlay={true}
           doubleClickToFullscreen={true}
@@ -303,13 +285,4 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   )
 }
 
-// Type for player ref
-interface PlayerRef {
-  play: () => void
-  pause: () => void
-  seekTo: (frame: number) => void
-  getCurrentFrame: () => number
-  setVolume: (volume: number) => void
-  setMuted: (muted: boolean) => void
-  requestFullscreen: () => void
-}
+

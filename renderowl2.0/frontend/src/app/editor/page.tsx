@@ -1,10 +1,12 @@
 "use client"
 
 import { Suspense } from "react"
+import dynamic from "next/dynamic"
 import { Loader2 } from "lucide-react"
-import EditorContent from "./EditorContent"
 
-export const dynamic = "force-dynamic"
+const EditorContent = dynamic(() => import("./EditorContent"), {
+  ssr: false,
+})
 
 function EditorLoading() {
   return (

@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: '/dashboard',
     NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: '/dashboard',
   },
+  // Transpile Remotion packages
+  transpilePackages: ['@remotion/player'],
 };
 
 export default nextConfig;

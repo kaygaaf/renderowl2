@@ -1,0 +1,16 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/render/route": "/api/render",
+  "/api/health/route": "/api/health",
+  "/editor/page": "/editor",
+  "/dashboard/billing/page": "/dashboard/billing",
+  "/auth/page": "/auth",
+  "/dashboard/settings/page": "/dashboard/settings",
+  "/dashboard/videos/page": "/dashboard/videos",
+  "/help/page": "/help",
+  "/page": "/",
+  "/dashboard/page": "/dashboard",
+  "/templates/page": "/templates",
+  "/features/page": "/features",
+  "/pricing/page": "/pricing"
+}
