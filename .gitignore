@@ -1,7 +1,29 @@
-# OpenClaw workspace ignores
-/config/secrets.env
-/config/*.key
-/config/*.pem
-/config/*.p12
-/config/*.json
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Large binaries
+*.node
+*.dll
+*.so
+*.dylib
+
+# Cache
+.cache/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Misc
 .DS_Store
+*.pem
