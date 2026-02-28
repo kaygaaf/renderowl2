@@ -38,11 +38,18 @@ func main() {
 	timelineRepo := repository.NewTimelineRepository(db)
 	clipRepo := repository.NewClipRepository(db)
 	trackRepo := repository.NewTrackRepository(db)
+	templateRepo := repository.NewTemplateRepository(db)
+
+	// Seed default templates
+	if err := templateRepo.SeedDefaultTemplates(); err != nil {
+		log.Printf("Warning: Failed to seed default templates: %v", err)
+	}
 
 	// Initialize services
 	timelineService := service.NewTimelineService(timelineRepo)
 	clipService := service.NewClipService(clipRepo, timelineRepo)
 	trackService := service.NewTrackService(trackRepo, timelineRepo)
+	templateService := service.NewTemplateService(templateRepo, timelineRepo, trackRepo, clipRepo)
 	aiScriptService := service.NewAIScriptService()
 	aiSceneService := service.NewAISceneService()
 	ttsService := service.NewTTSService()
@@ -51,6 +58,7 @@ func main() {
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
 	clipHandler := handlers.NewClipHandler(clipService)
 	trackHandler := handlers.NewTrackHandler(trackService)
+	templateHandler := handlers.NewTemplateHandler(templateService)
 	healthHandler := handlers.NewHealthHandler(db)
 	aiHandler := handlers.NewAIHandler(aiScriptService, aiSceneService, ttsService)
 
@@ -83,8 +91,12 @@ func main() {
 		api.PUT("/clips/:clipId", clipHandler.Update)
 		api.DELETE("/clips/:clipId", clipHandler.Delete)
 
-		// Track endpoints
-		api.POST("/timelines/:id/tracks", trackHandler.Create)
+		// Template endpoints
+		api.GET("/templates", templateHandler.List)
+		api.GET("/templates/categories", templateHandler.GetCategories)
+		api.GET("/templates/stats", templateHandler.GetStats)
+		api.GET("/templates/:id", templateHandler.Get)
+		api.POST("/templates/:id/use", templateHandler.Use)
 		api.GET("/timelines/:id/tracks", trackHandler.List)
 		api.PUT("/tracks/:trackId", trackHandler.Update)
 		api.DELETE("/tracks/:trackId", trackHandler.Delete)
@@ -118,5 +130,6 @@ func migrateDB(db *gorm.DB) error {
 		&repository.TimelineModel{},
 		&repository.ClipModel{},
 		&repository.TrackModel{},
+		&repository.TemplateModel{},
 	)
 }
