@@ -182,4 +182,133 @@ export const trackApi = {
   },
 }
 
+// API helper functions for AI services
+export const aiApi = {
+  // Generate a script from a prompt
+  generateScript: async (data: {
+    prompt: string
+    style?: string
+    duration?: number
+    max_scenes?: number
+    language?: string
+    tone?: string
+    target_audience?: string
+  }) => {
+    const response = await api.post("/ai/script", data)
+    return response.data
+  },
+
+  // Enhance an existing script
+  enhanceScript: async (data: {
+    script: Script
+    enhancement_type: string
+  }) => {
+    const response = await api.post("/ai/script/enhance", data)
+    return response.data
+  },
+
+  // Get available script styles
+  getScriptStyles: async () => {
+    const response = await api.get("/ai/script-styles")
+    return response.data
+  },
+
+  // Generate scenes from script information
+  generateScenes: async (data: {
+    script_id?: string
+    script_title?: string
+    scenes: SceneInfo[]
+    style?: string
+    image_source?: string
+    generate_images?: boolean
+  }) => {
+    const response = await api.post("/ai/scenes", data)
+    return response.data
+  },
+
+  // Get available image sources
+  getImageSources: async () => {
+    const response = await api.get("/ai/image-sources")
+    return response.data
+  },
+
+  // Generate voice narration
+  generateVoice: async (data: {
+    text: string
+    voice_id: string
+    provider?: string
+    stability?: number
+    clarity?: number
+    style?: number
+    speed?: number
+    response_format?: string
+    use_ssml?: boolean
+  }) => {
+    const response = await api.post("/ai/voice", data)
+    return response.data
+  },
+
+  // List available voices
+  listVoices: async () => {
+    const response = await api.get("/ai/voices")
+    return response.data
+  },
+}
+
+// Types for AI API
+export interface Script {
+  title: string
+  description: string
+  total_duration: number
+  scenes: Scene[]
+  style: string
+  language: string
+  keywords?: string[]
+}
+
+export interface Scene {
+  number: number
+  title: string
+  description: string
+  narration: string
+  duration: number
+  visual_notes?: string
+  keywords?: string[]
+}
+
+export interface SceneInfo {
+  number: number
+  title: string
+  description: string
+  keywords?: string[]
+}
+
+export interface GeneratedScene {
+  number: number
+  title: string
+  description: string
+  enhanced_description?: string
+  image_url?: string
+  thumbnail_url?: string
+  image_source: string
+  image_prompt?: string
+  alt_text?: string
+  color_palette?: string[]
+  mood?: string
+}
+
+export interface Voice {
+  id: string
+  name: string
+  provider: string
+  gender?: string
+  language?: string
+  accent?: string
+  age?: string
+  description?: string
+  preview_url?: string
+  category?: string
+  labels?: Record<string, string>
+}
+
 export default api

@@ -43,12 +43,16 @@ func main() {
 	timelineService := service.NewTimelineService(timelineRepo)
 	clipService := service.NewClipService(clipRepo, timelineRepo)
 	trackService := service.NewTrackService(trackRepo, timelineRepo)
+	aiScriptService := service.NewAIScriptService()
+	aiSceneService := service.NewAISceneService()
+	ttsService := service.NewTTSService()
 
 	// Initialize handlers
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
 	clipHandler := handlers.NewClipHandler(clipService)
 	trackHandler := handlers.NewTrackHandler(trackService)
 	healthHandler := handlers.NewHealthHandler(db)
+	aiHandler := handlers.NewAIHandler(aiScriptService, aiSceneService, ttsService)
 
 	// Setup router
 	r := gin.Default()
@@ -87,6 +91,15 @@ func main() {
 		api.PATCH("/tracks/:trackId/reorder", trackHandler.Reorder)
 		api.PATCH("/tracks/:trackId/mute", trackHandler.ToggleMute)
 		api.PATCH("/tracks/:trackId/solo", trackHandler.ToggleSolo)
+
+		// AI endpoints
+		api.POST("/ai/script", aiHandler.GenerateScript)
+		api.POST("/ai/script/enhance", aiHandler.EnhanceScript)
+		api.GET("/ai/script-styles", aiHandler.GetScriptStyles)
+		api.POST("/ai/scenes", aiHandler.GenerateScenes)
+		api.GET("/ai/image-sources", aiHandler.GetImageSources)
+		api.POST("/ai/voice", aiHandler.GenerateVoice)
+		api.GET("/ai/voices", aiHandler.ListVoices)
 	}
 
 	// Start server

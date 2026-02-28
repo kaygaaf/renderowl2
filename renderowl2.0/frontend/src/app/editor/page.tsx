@@ -1,12 +1,8 @@
-"use client"
-
 import { Suspense } from "react"
 import dynamic from "next/dynamic"
 import { Loader2 } from "lucide-react"
 
-const EditorContent = dynamic(() => import("./EditorContent"), {
-  ssr: false,
-})
+const EditorPageClient = dynamic(() => import("./EditorPageClient"))
 
 function EditorLoading() {
   return (
@@ -19,7 +15,7 @@ function EditorLoading() {
 export default function EditorPage() {
   return (
     <Suspense fallback={<EditorLoading />}>
-      <EditorContent />
+      <EditorPageClient />
     </Suspense>
   )
 }

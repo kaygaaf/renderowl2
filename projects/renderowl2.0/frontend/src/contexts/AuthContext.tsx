@@ -18,7 +18,7 @@ import { api } from '@/lib/api';
 interface AuthContextType {
   isLoaded: boolean;
   isSignedIn: boolean | undefined;
-  userId: string | undefined;
+  userId: string | null | undefined;
   user: ReturnType<typeof useClerkUser>['user'];
   getToken: () => Promise<string | null>;
   backendUser: BackendUser | null;

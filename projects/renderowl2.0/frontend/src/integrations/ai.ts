@@ -15,10 +15,9 @@ import {
   AIGenerationRequest, 
   AIVoiceover,
   AIGeneratedAsset,
-  TimelineTrack,
-  TimelineClip,
   CaptionSegment 
 } from '@/types/integration';
+import { TimelineTrack, TimelineClip } from '@/types/timeline';
 import { api } from '@/lib/api';
 import { CaptionStyle } from '@/types/timeline';
 
