@@ -1,0 +1,23 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to Coolify
+      run: |
+        echo "Triggering Coolify deployment..."
+        curl -X POST "https://app.coolify.io/api/v1/applications/mocsks4gcgggwgss080s80ws/restart" \
+          -H "Authorization: Bearer ${{ secrets.COOLIFY_API_KEY }}" \
+          -H "Content-Type: application/json"
+    
+    - name: Check deployment status
+      run: |
+        sleep 30
+        curl -s "https://staging.renderowl.com" -I | head -5
