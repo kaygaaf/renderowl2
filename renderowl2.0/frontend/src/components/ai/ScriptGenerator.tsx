@@ -46,13 +46,10 @@ export function ScriptGenerator({ onScriptGenerated, className }: ScriptGenerato
     setIsGenerating(true)
     try {
       const script = await aiApi.generateScript({
-        prompt: prompt.trim(),
+        topic: prompt.trim(),
         style,
         duration: duration[0],
-        max_scenes: maxScenes[0],
         language,
-        tone: tone || undefined,
-        target_audience: targetAudience || undefined,
       })
       setGeneratedScript(script)
       onScriptGenerated?.(script)
@@ -71,8 +68,8 @@ export function ScriptGenerator({ onScriptGenerated, className }: ScriptGenerato
     setIsGenerating(true)
     try {
       const enhanced = await aiApi.enhanceScript({
-        script: generatedScript,
-        enhancement_type: enhancementType,
+        scriptId: generatedScript.id,
+        improvements: [enhancementType],
       })
       setGeneratedScript(enhanced)
       onScriptGenerated?.(enhanced)
@@ -256,12 +253,12 @@ export function ScriptGenerator({ onScriptGenerated, className }: ScriptGenerato
             <p className="text-sm text-muted-foreground">{generatedScript.description}</p>
             <div className="text-sm">
               <span className="font-medium">Duration:</span> {generatedScript.total_duration}s |{" "}
-              <span className="font-medium">Scenes:</span> {generatedScript.scenes.length} |{" "}
+              <span className="font-medium">Scenes:</span> {generatedScript.scenes?.length || 0} |{" "}
               <span className="font-medium">Style:</span> {generatedScript.style}
             </div>
             <div className="space-y-2">
               <h4 className="font-medium text-sm">Scenes:</h4>
-              {generatedScript.scenes.map((scene) => (
+              {generatedScript.scenes?.map((scene) => (
                 <div key={scene.number} className="bg-background rounded p-3 text-sm">
                   <div className="font-medium">
                     Scene {scene.number}: {scene.title}

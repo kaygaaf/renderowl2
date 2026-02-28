@@ -40,11 +40,11 @@ export function VoiceSelector({ script, onVoiceGenerated, className }: VoiceSele
   const loadVoices = async () => {
     setIsLoading(true)
     try {
-      const response = await aiApi.listVoices()
-      setVoices(response.data)
-      if (response.data.length > 0) {
-        setSelectedVoice(response.data[0].id)
-        setProvider(response.data[0].provider)
+      const voices = await aiApi.listVoices()
+      setVoices(voices)
+      if (voices.length > 0) {
+        setSelectedVoice(voices[0].id)
+        setProvider(voices[0].provider || "elevenlabs")
       }
     } catch (error) {
       console.error("Failed to load voices:", error)
@@ -58,7 +58,7 @@ export function VoiceSelector({ script, onVoiceGenerated, className }: VoiceSele
     setSelectedVoice(voiceId)
     const voice = voices.find((v) => v.id === voiceId)
     if (voice) {
-      setProvider(voice.provider)
+      setProvider(voice.provider || "elevenlabs")
     }
   }
 
@@ -142,7 +142,7 @@ export function VoiceSelector({ script, onVoiceGenerated, className }: VoiceSele
   }
 
   const groupedVoices = voices.reduce((acc, voice) => {
-    const key = voice.provider
+    const key = voice.provider || "unknown"
     if (!acc[key]) acc[key] = []
     acc[key].push(voice)
     return acc
@@ -284,7 +284,7 @@ export function VoiceSelector({ script, onVoiceGenerated, className }: VoiceSele
         {/* Scenes */}
         <div className="space-y-4">
           <h3 className="font-semibold">Generate Narration for Scenes</h3>
-          {script.scenes.map((scene) => {
+          {script.scenes?.map((scene) => {
             const audio = generatedAudio[scene.number]
             return (
               <div

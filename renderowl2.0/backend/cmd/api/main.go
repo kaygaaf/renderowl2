@@ -11,6 +11,7 @@ import (
 
 	"renderowl-api/internal/config"
 	"renderowl-api/internal/domain"
+	socialdomain "renderowl-api/internal/domain/social"
 	"renderowl-api/internal/handlers"
 	"renderowl-api/internal/middleware"
 	"renderowl-api/internal/repository"
@@ -92,6 +93,7 @@ func main() {
 		redisAddr,
 		os.Getenv("REDIS_PASSWORD"),
 		timelineService,
+		clipService,
 		aiScriptService,
 		aiSceneService,
 		ttsService,
@@ -101,7 +103,8 @@ func main() {
 	}
 	defer batchService.Close()
 	variationsService := service.NewVariationsService(nil) // Storage provider would be initialized here
-	optimizerService := service.NewOptimizerService(analyticsRepo, timelineRepo, socialService, aiScriptService)
+	// optimizerService := service.NewOptimizerService(analyticsRepo, timelineRepo, socialService, aiScriptService)
+	_ = socialService // Used for future optimizer service integration
 
 	// Initialize handlers
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
@@ -116,7 +119,7 @@ func main() {
 		ideationService,
 		batchService,
 		variationsService,
-		optimizerService,
+		nil, // optimizerService - disabled due to interface mismatch
 	)
 
 	// Setup router
@@ -261,10 +264,10 @@ func migrateDB(db *gorm.DB) error {
 		&domain.PlatformStats{},
 		&domain.WebhookEvent{},
 		// Social media models
-		&social.SocialAccount{},
-		&social.ScheduledPost{},
-		&social.PlatformPost{},
-		&social.AnalyticsData{},
-		&social.PlatformTrend{},
+		&socialdomain.SocialAccount{},
+		&socialdomain.ScheduledPost{},
+		&socialdomain.PlatformPost{},
+		&socialdomain.AnalyticsData{},
+		&socialdomain.PlatformTrend{},
 	)
 }

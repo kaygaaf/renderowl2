@@ -138,17 +138,17 @@ export function AITimelineGenerator({
 
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i]
-        const scriptScene = script.scenes[i]
+        const scriptScene = script.scenes?.[i]
         const sceneDuration = scriptScene?.duration || 5
 
         // Video clip with scene image
         if (scene.image_url) {
           const videoClip = await clipApi.create(timelineId, {
-            track_id: videoTrack.id,
-            start_time: currentTime,
-            end_time: currentTime + sceneDuration,
-            asset_type: "image",
-            asset_url: scene.image_url
+            trackId: videoTrack.id,
+            startTime: currentTime,
+            endTime: currentTime + sceneDuration,
+            assetType: "image",
+            assetUrl: scene.image_url
           })
           clips.push(videoClip)
         }
@@ -156,11 +156,11 @@ export function AITimelineGenerator({
         // Audio clip with voice
         if (audioUrls && audioUrls[scene.number]) {
           const audioClip = await clipApi.create(timelineId, {
-            track_id: audioTrack.id,
-            start_time: currentTime,
-            end_time: currentTime + sceneDuration,
-            asset_type: "audio",
-            asset_url: `data:audio/mp3;base64,${audioUrls[scene.number]}`
+            trackId: audioTrack.id,
+            startTime: currentTime,
+            endTime: currentTime + sceneDuration,
+            assetType: "audio",
+            assetUrl: `data:audio/mp3;base64,${audioUrls[scene.number]}`
           })
           clips.push(audioClip)
         }
@@ -168,11 +168,11 @@ export function AITimelineGenerator({
         // Text clip with narration
         if (scriptScene?.narration) {
           const textClip = await clipApi.create(timelineId, {
-            track_id: textTrack.id,
-            start_time: currentTime,
-            end_time: currentTime + sceneDuration,
-            asset_type: "text",
-            text_content: scriptScene.narration
+            trackId: textTrack.id,
+            startTime: currentTime,
+            endTime: currentTime + sceneDuration,
+            assetType: "text",
+            textContent: scriptScene.narration
           })
           clips.push(textClip)
         }

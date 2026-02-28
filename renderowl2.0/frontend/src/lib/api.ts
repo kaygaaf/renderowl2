@@ -66,30 +66,35 @@ export interface Timeline {
 export interface TimelineTrack {
   id: string
   timelineId: string
-  type: "video" | "audio" | "text" | "image"
+  type: "video" | "audio" | "text"
   name: string
   order: number
   muted?: boolean
   visible?: boolean
+  clips: TimelineClip[]  // Required for frontend compatibility
 }
 
 export interface TimelineClip {
   id: string
   trackId: string
-  type: "video" | "audio" | "text" | "image"
-  startTime: number
-  duration: number
-  src?: string
-  text?: string
-  style?: Record<string, any>
-  metadata?: Record<string, any>
+  startTime: number // in seconds
+  endTime: number // in seconds
+  assetType: "video" | "audio" | "text" | "image"
+  assetUrl?: string
+  textContent?: string
+  position?: { x: number; y: number }
+  scale?: number
+  opacity?: number
+  transition?: "fade" | "slide" | "zoom" | "none"
 }
 
 export interface Script {
   id: string
   title: string
+  description?: string
   content: string
   style: string
+  total_duration?: number
   scenes?: Scene[]
 }
 
@@ -99,6 +104,23 @@ export interface Scene {
   description: string
   duration: number
   order: number
+  number: number
+  narration?: string
+}
+
+export interface GeneratedScene {
+  number: number
+  title: string
+  description: string
+  duration: number
+  image_url?: string
+  alt_text?: string
+  source?: string
+  image_source?: string
+  mood?: string
+  enhanced_description?: string
+  image_prompt?: string
+  color_palette?: string[]
 }
 
 export interface Voice {
@@ -107,6 +129,9 @@ export interface Voice {
   language: string
   gender: string
   previewUrl?: string
+  provider?: string
+  description?: string
+  accent?: string
 }
 
 // Timeline API
@@ -233,10 +258,14 @@ export const aiApi = {
   },
 
   generateVoice: async (params: {
-    scriptId: string
-    voiceId: string
-    settings?: Record<string, any>
-  }): Promise<{ audioUrl: string; duration: number }> => {
+    text: string | undefined
+    voice_id: string
+    provider?: string
+    stability?: number
+    clarity?: number
+    speed?: number
+    use_ssml?: boolean
+  }): Promise<{ audio_base64: string; duration: number }> => {
     const response = await api.post("/ai/generate-voice", params)
     return response.data.data
   },

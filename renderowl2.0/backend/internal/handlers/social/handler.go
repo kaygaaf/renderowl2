@@ -6,21 +6,22 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"renderowl-api/internal/domain/social"
+	socialdomain "renderowl-api/internal/domain/social"
 	"renderowl-api/internal/scheduler"
 	"renderowl-api/internal/service"
+	socialsvc "renderowl-api/internal/service/social"
 )
 
 // Handler handles social media HTTP requests
 type Handler struct {
-	socialService *social.Service
+	socialService *socialsvc.Service
 	publisher     *service.Publisher
 	scheduler     *scheduler.Scheduler
 }
 
 // NewSocialHandler creates a new social media handler
 func NewSocialHandler(
-	socialService *social.Service,
+	socialService *socialsvc.Service,
 	publisher *service.Publisher,
 	scheduler *scheduler.Scheduler,
 ) *Handler {
@@ -81,7 +82,7 @@ func (h *Handler) DisconnectAccount(c *gin.Context) {
 
 // GetAuthURL returns OAuth URL for a platform
 func (h *Handler) GetAuthURL(c *gin.Context) {
-	platform := social.SocialPlatform(c.Param("platform"))
+	platform := socialdomain.SocialPlatform(c.Param("platform"))
 	state := c.Query("state")
 	if state == "" {
 		state = generateState()
@@ -101,7 +102,7 @@ func (h *Handler) GetAuthURL(c *gin.Context) {
 
 // HandleCallback handles OAuth callback
 func (h *Handler) HandleCallback(c *gin.Context) {
-	platform := social.SocialPlatform(c.Param("platform"))
+	platform := socialdomain.SocialPlatform(c.Param("platform"))
 	userID := c.GetString("userID")
 
 	var req struct {
@@ -138,7 +139,7 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	uploadReq := &social.UploadRequest{
+	uploadReq := &socialdomain.UploadRequest{
 		VideoPath:   req.VideoPath,
 		Title:       req.Title,
 		Description: req.Description,
@@ -171,7 +172,7 @@ func (h *Handler) CrossPost(c *gin.Context) {
 		return
 	}
 
-	uploadReq := &social.UploadRequest{
+	uploadReq := &socialdomain.UploadRequest{
 		VideoPath:   req.VideoPath,
 		Title:       req.Title,
 		Description: req.Description,
@@ -195,13 +196,13 @@ func (h *Handler) SchedulePost(c *gin.Context) {
 	userID := c.GetString("userID")
 
 	var req struct {
-		VideoID     string                  `json:"videoId"`
-		Title       string                  `json:"title"`
-		Description string                  `json:"description"`
-		Platforms   []PlatformScheduleReq   `json:"platforms"`
-		ScheduledAt string                  `json:"scheduledAt"`
-		Timezone    string                  `json:"timezone"`
-		Recurring   *social.RecurringRule   `json:"recurring,omitempty"`
+		VideoID     string                   `json:"videoId"`
+		Title       string                   `json:"title"`
+		Description string                   `json:"description"`
+		Platforms   []PlatformScheduleReq    `json:"platforms"`
+		ScheduledAt string                   `json:"scheduledAt"`
+		Timezone    string                   `json:"timezone"`
+		Recurring   *socialdomain.RecurringRule `json:"recurring,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -215,7 +216,7 @@ func (h *Handler) SchedulePost(c *gin.Context) {
 		return
 	}
 
-	post := &social.ScheduledPost{
+	post := &socialdomain.ScheduledPost{
 		UserID:      userID,
 		VideoID:     req.VideoID,
 		Title:       req.Title,
@@ -223,16 +224,16 @@ func (h *Handler) SchedulePost(c *gin.Context) {
 		ScheduledAt: scheduledAt,
 		Timezone:    req.Timezone,
 		Recurring:   req.Recurring,
-		Metadata: social.JSON{
+		Metadata: socialdomain.JSON{
 			"videoPath": req.VideoID, // Would be resolved from video service
 		},
 	}
 
 	// Convert platform requests
 	for _, p := range req.Platforms {
-		post.Platforms = append(post.Platforms, social.PlatformPost{
+		post.Platforms = append(post.Platforms, socialdomain.PlatformPost{
 			AccountID:   p.AccountID,
-			Platform:    social.SocialPlatform(p.Platform),
+			Platform:    socialdomain.SocialPlatform(p.Platform),
 			CustomTitle: p.Title,
 			CustomDesc:  p.Description,
 			Tags:        p.Tags,
@@ -380,7 +381,6 @@ func generateState() string {
 
 func generateID() string {
 	// Simple ID generation
-	import "time"
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 

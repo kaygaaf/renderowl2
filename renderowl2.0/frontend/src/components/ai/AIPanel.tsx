@@ -27,7 +27,7 @@ export function AIPanel({ onApplyToTimeline, className }: AIPanelProps) {
     setScenes([]) // Clear scenes when new script is generated
     setGeneratedAudio({})
     // Auto-advance to scenes tab after script generation
-    if (newScript.scenes.length > 0) {
+    if (newScript.scenes && newScript.scenes.length > 0) {
       setActiveTab("scenes")
     }
   }

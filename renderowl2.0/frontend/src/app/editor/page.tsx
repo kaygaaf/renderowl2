@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Navbar } from "@/components/layout/Navbar"
@@ -35,7 +35,7 @@ const TRACK_COLORS = {
   image: { bg: "rgba(249, 115, 22, 0.4)", border: "rgba(249, 115, 22, 0.6)" }
 }
 
-export default function IntegratedEditorPage() {
+function EditorContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isSignedIn, isLoaded } = useAuth()
@@ -276,7 +276,7 @@ export default function IntegratedEditorPage() {
 
   const handleDeleteTrack = async (trackId: string) => {
     try {
-      await trackApi.delete(trackId)
+      await trackApi.delete(timeline?.id || "", trackId)
       setTracks(prev => prev.filter(t => t.id !== trackId))
       setTimeline(prev => prev ? {
         ...prev,
@@ -636,5 +636,17 @@ export default function IntegratedEditorPage() {
         videoDescription={timeline?.name}
       />
     </div>
+  )
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    }>
+      <EditorContent />
+    </Suspense>
   )
 }

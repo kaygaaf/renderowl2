@@ -559,9 +559,9 @@ func (s *OptimizerService) AutoOptimizeTitle(ctx context.Context, videoID string
 	// Select best template based on issues
 	selectedTemplate := templates[0]
 	
-	if contains(issues, "not_question") {
+	if containsString(issues, "not_question") {
 		selectedTemplate = templates[2]
-	} else if contains(issues, "no_numbers") {
+	} else if containsString(issues, "no_numbers") {
 		selectedTemplate = templates[1]
 	}
 
@@ -679,6 +679,15 @@ type WinningContentAnalysis struct {
 }
 
 // Helper functions
+
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
 
 func extractTopic(title string) string {
 	// Simplified topic extraction

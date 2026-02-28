@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await timelineApi.list()
       // Map backend timeline data to frontend Project format
-      const mappedProjects: Project[] = response.data?.map((timeline: any) => ({
+      const mappedProjects: Project[] = response?.map((timeline: any) => ({
         id: timeline.id,
         title: timeline.name,
         description: timeline.description,

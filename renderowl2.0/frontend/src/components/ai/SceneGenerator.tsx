@@ -42,7 +42,7 @@ export function SceneGenerator({ script, onScenesGenerated, className }: SceneGe
   const [regeneratingScene, setRegeneratingScene] = useState<number | null>(null)
 
   const handleGenerate = async () => {
-    if (!script || script.scenes.length === 0) {
+    if (!script || !script.scenes || script.scenes.length === 0) {
       toast.error("Please generate or provide a script first")
       return
     }
@@ -50,21 +50,12 @@ export function SceneGenerator({ script, onScenesGenerated, className }: SceneGe
     setIsGenerating(true)
     try {
       const result = await aiApi.generateScenes({
-        script_id: undefined,
-        script_title: script.title,
-        scenes: script.scenes.map((scene: Scene) => ({
-          number: scene.number,
-          title: scene.title,
-          description: scene.description,
-          keywords: scene.keywords || [],
-        })),
+        scriptId: script.id,
         style,
-        image_source: imageSource,
-        generate_images: generateImages,
       })
-      setGeneratedScenes(result.scenes)
-      onScenesGenerated?.(result.scenes)
-      toast.success(`Generated ${result.scenes.length} scenes!`)
+      setGeneratedScenes(result)
+      onScenesGenerated?.(result)
+      toast.success(`Generated ${result.length} scenes!`)
     } catch (error) {
       console.error("Failed to generate scenes:", error)
       toast.error("Failed to generate scenes. Please try again.")
@@ -204,7 +195,7 @@ export function SceneGenerator({ script, onScenesGenerated, className }: SceneGe
           ) : (
             <>
               <Sparkles className="mr-2 h-4 w-4" />
-              Generate {script.scenes.length} Scenes
+              Generate {script.scenes?.length || 0} Scenes
             </>
           )}
         </Button>

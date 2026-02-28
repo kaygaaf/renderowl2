@@ -111,22 +111,22 @@ export function TemplateTimelineLoader({
         // Video clip
         if (scene.imageUrl) {
           await clipApi.create(project.id, {
-            track_id: videoTrack.id,
-            start_time: currentTime,
-            end_time: currentTime + scene.duration,
-            asset_type: "image",
-            asset_url: scene.imageUrl
+            trackId: videoTrack.id,
+            startTime: currentTime,
+            endTime: currentTime + scene.duration,
+            assetType: "image",
+            assetUrl: scene.imageUrl
           })
         }
 
         // Text clip
         if (scene.textContent) {
           await clipApi.create(project.id, {
-            track_id: textTrack.id,
-            start_time: currentTime,
-            end_time: currentTime + scene.duration,
-            asset_type: "text",
-            text_content: scene.textContent
+            trackId: textTrack.id,
+            startTime: currentTime,
+            endTime: currentTime + scene.duration,
+            assetType: "text",
+            textContent: scene.textContent
           })
         }
 

@@ -494,12 +494,23 @@ func (s *BatchService) generateVideo(ctx context.Context, video *domain.BatchVid
 	video.Progress = 25
 	s.repo.Update(batch)
 
-	// Step 2: Generate scenes
+	// Step 2: Generate scenes - convert script scenes to SceneInfo
+	sceneInfos := make([]SceneInfo, 0, len(script.Scenes))
+	for _, scene := range script.Scenes {
+		sceneInfos = append(sceneInfos, SceneInfo{
+			Number:      scene.Number,
+			Title:       scene.Title,
+			Description: scene.Description,
+			Keywords:    scene.Keywords,
+		})
+	}
+
 	sceneReq := &GenerateScenesRequest{
-		Script:      script,
-		ImageSource: "unsplash",
-		SceneCount:  5,
-		Duration:    batch.Config.Duration,
+		ScriptID:       script.Title,
+		Scenes:         sceneInfos,
+		Style:          string(script.Style),
+		ImageSource:    SourceUnsplash,
+		GenerateImages: true,
 	}
 
 	scenes, err := s.aiSceneService.GenerateScenes(ctx, sceneReq)
@@ -514,10 +525,11 @@ func (s *BatchService) generateVideo(ctx context.Context, video *domain.BatchVid
 	// Step 3: Generate voice if enabled
 	if batch.Config.VoiceID != "" {
 		ttsReq := &GenerateVoiceRequest{
-			Text:   script.Description,
-			Voice:  batch.Config.VoiceID,
-			Speed:  1.0,
-			Format: "mp3",
+			Text:           script.Description,
+			VoiceID:        batch.Config.VoiceID,
+			Provider:       ProviderElevenLabs,
+			Speed:          1.0,
+			ResponseFormat: "mp3",
 		}
 
 		_, err := s.ttsService.GenerateVoice(ctx, ttsReq)
@@ -547,20 +559,29 @@ func (s *BatchService) generateVideo(ctx context.Context, video *domain.BatchVid
 	}
 
 	// Step 5: Add scenes as clips
+	// Create a default track first or use the timeline ID as track reference
+	currentTime := 0.0
+	sceneDuration := float64(batch.Config.Duration) / float64(len(scenes.Scenes))
+	if len(scenes.Scenes) == 0 {
+		sceneDuration = 5.0 // Default 5 seconds per scene if no scenes
+	}
+
 	for i, scene := range scenes.Scenes {
 		clipReq := &CreateClipRequest{
+			TrackID:     timeline.ID, // Using timeline ID as track reference
 			Name:        fmt.Sprintf("Scene %d: %s", i+1, scene.Title),
 			Type:        "image",
 			SourceURL:   scene.ImageURL,
-			StartTime:   scene.StartTime,
-			Duration:    scene.Duration,
-			TextContent: scene.ScriptText,
+			StartTime:   currentTime,
+			EndTime:     currentTime + sceneDuration,
+			TextContent: scene.Description,
 		}
 
-		_, err := s.timelineService.AddClip(timeline.ID, clipReq)
+		_, err := s.clipService.Create(batch.UserID, timeline.ID, clipReq)
 		if err != nil {
 			log.Printf("Failed to add clip: %v", err)
 		}
+		currentTime += sceneDuration
 	}
 
 	renderTime := int(time.Since(startTime).Seconds())

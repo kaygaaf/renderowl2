@@ -3,10 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
-	"image"
 	"image/color"
-	"image/draw"
-	"image/jpeg"
+	"log"
 	"math"
 	"strings"
 	"sync"
@@ -631,7 +629,7 @@ func (s *VariationsService) generateThumbnailImage(variation *ThumbnailVariation
 	
 	var buf strings.Builder
 	// Use image/jpeg to encode
-	output := make([]byte, 0)
+	_ = make([]byte, 0)
 	
 	// Simple encoding - in production use proper JPEG encoding
 	_ = img
