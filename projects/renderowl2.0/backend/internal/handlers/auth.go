@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kaygaaf/renderowl2/internal/auth"
-	"github.com/kaygaaf/renderowl2/internal/domain"
 	"github.com/kaygaaf/renderowl2/internal/service"
 )
 
