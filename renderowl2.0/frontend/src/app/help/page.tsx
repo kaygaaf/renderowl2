@@ -2,6 +2,8 @@ import { Navbar } from "@/components/layout/Navbar"
 import { Footer } from "@/components/landing/Footer"
 import { HelpContent } from "@/components/help/HelpContent"
 
+export const dynamic = "force-dynamic"
+
 export default function HelpPage() {
   return (
     <div className="min-h-screen flex flex-col">

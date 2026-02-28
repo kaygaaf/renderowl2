@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs"
 import { VideosList } from "@/components/dashboard/VideosList"
 
+export const dynamic = "force-dynamic"
+
 export default async function VideosPage() {
   const { userId } = await auth()
   

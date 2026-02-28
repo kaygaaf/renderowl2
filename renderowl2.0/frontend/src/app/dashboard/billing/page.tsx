@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs"
 import { BillingContent } from "@/components/dashboard/BillingContent"
 
+export const dynamic = "force-dynamic"
+
 export default async function BillingPage() {
   const { userId } = await auth()
   

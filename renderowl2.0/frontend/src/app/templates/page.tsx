@@ -2,6 +2,8 @@ import { Navbar } from "@/components/layout/Navbar"
 import { Footer } from "@/components/landing/Footer"
 import { TemplatesGallery } from "@/components/templates/TemplatesGallery"
 
+export const dynamic = "force-dynamic"
+
 export default function TemplatesPage() {
   return (
     <div className="min-h-screen flex flex-col">

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Film, Menu, X, Sparkles } from "lucide-react"
+import { Film, Menu, X } from "lucide-react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -15,7 +15,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useAuth } from "@/contexts/AuthContext"
+
+// Try to import Clerk, fallback to null if not available
+let useAuth: any = null
+try {
+  const clerk = require("@clerk/nextjs")
+  useAuth = clerk.useAuth
+} catch (e) {
+  // Clerk not available
+}
 
 const navLinks = [
   { href: "/features", label: "Features" },
@@ -26,12 +34,22 @@ const navLinks = [
 export function Navbar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { isSignedIn, userData, signOut } = useAuth()
-
-  const isLanding = pathname === "/"
+  
+  // Use Clerk auth if available, otherwise use fallback
+  const auth = useAuth ? useAuth() : { isSignedIn: false, user: null, signOut: async () => {} }
+  const { isSignedIn, user, signOut } = auth
+  
+  // Extract user data if available
+  const userData = user ? {
+    name: user.fullName || user.firstName || "User",
+    email: user.primaryEmailAddress?.emailAddress || "",
+    avatar: user.imageUrl,
+  } : null
 
   const handleSignOut = async () => {
-    await signOut()
+    if (signOut) {
+      await signOut()
+    }
   }
 
   return (

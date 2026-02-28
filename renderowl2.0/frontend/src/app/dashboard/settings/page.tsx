@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs"
 import { SettingsContent } from "@/components/dashboard/SettingsContent"
 
+export const dynamic = "force-dynamic"
+
 export default async function SettingsPage() {
   const { userId } = await auth()
   

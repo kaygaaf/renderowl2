@@ -1,8 +1,18 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
-import { useUser, useAuth as useClerkAuth } from "@clerk/nextjs"
 import { timelineApi, setTokenGetter } from "@/lib/api"
+
+// Try to import Clerk, fallback to null if not available
+let useUser: any = null
+let useAuth: any = null
+try {
+  const clerk = require("@clerk/nextjs")
+  useUser = clerk.useUser
+  useAuth = clerk.useAuth
+} catch (e) {
+  // Clerk not available
+}
 
 interface Project {
   id: string
@@ -27,7 +37,7 @@ interface UserData {
 
 interface AuthContextType {
   // Clerk user data
-  user: ReturnType<typeof useUser>["user"]
+  user: any
   isLoaded: boolean
   isSignedIn: boolean
   
@@ -45,8 +55,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { user, isLoaded } = useUser()
-  const { signOut: clerkSignOut, isSignedIn, getToken } = useClerkAuth()
+  // Use Clerk hooks if available, otherwise fallback
+  const clerkUser = useUser ? useUser() : { user: null, isLoaded: true }
+  const clerkAuth = useAuth ? useAuth() : { isSignedIn: false, signOut: async () => {}, getToken: async () => null }
+  
+  const { user, isLoaded } = clerkUser
+  const { isSignedIn, signOut: clerkSignOut, getToken } = clerkAuth
   
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
@@ -119,7 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isSignedIn])
 
   const handleSignOut = async () => {
-    await clerkSignOut()
+    if (clerkSignOut) {
+      await clerkSignOut()
+    }
     setUserData(null)
     setProjects([])
   }

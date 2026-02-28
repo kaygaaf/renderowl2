@@ -4,6 +4,8 @@ import { Pricing } from "@/components/landing/Pricing"
 import { Card, CardContent } from "@/components/ui/card"
 import { Check } from "lucide-react"
 
+export const dynamic = "force-dynamic"
+
 const enterpriseFeatures = [
   "Unlimited team members",
   "Custom AI model training",

@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs"
 import { DashboardContent } from "@/components/dashboard/DashboardContent"
 
+export const dynamic = "force-dynamic"
+
 export default async function DashboardPage() {
   const { userId } = await auth()
   

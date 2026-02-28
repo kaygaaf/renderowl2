@@ -1,12 +1,15 @@
-import { SignIn, SignUp } from "@clerk/nextjs"
+import { SignInWrapper, SignUpWrapper } from "@/components/ClerkWrapper"
 import { Navbar } from "@/components/layout/Navbar"
 
-export default function AuthPage({
+export const dynamic = "force-dynamic"
+
+export default async function AuthPage({
   searchParams,
 }: {
-  searchParams: { mode?: string; plan?: string }
+  searchParams: Promise<{ mode?: string; plan?: string }>
 }) {
-  const mode = searchParams.mode || "login"
+  const params = await searchParams
+  const mode = params.mode || "login"
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -14,7 +17,7 @@ export default function AuthPage({
       <main className="flex-1 flex items-center justify-center py-12 px-4">
         <div className="w-full max-w-md">
           {mode === "signup" ? (
-            <SignUp 
+            <SignUpWrapper 
               appearance={{
                 elements: {
                   rootBox: "mx-auto",
@@ -25,10 +28,10 @@ export default function AuthPage({
                   footerActionLink: "text-blue-600 hover:text-blue-700",
                 }
               }}
-              redirectUrl={searchParams.plan ? `/dashboard?plan=${searchParams.plan}` : "/dashboard"}
+              redirectUrl={params.plan ? `/dashboard?plan=${params.plan}` : "/dashboard"}
             />
           ) : (
-            <SignIn 
+            <SignInWrapper 
               appearance={{
                 elements: {
                   rootBox: "mx-auto",

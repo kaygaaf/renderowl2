@@ -3,6 +3,8 @@ import { Footer } from "@/components/landing/Footer"
 import { Features } from "@/components/landing/Features"
 import { motion } from "framer-motion"
 
+export const dynamic = "force-dynamic"
+
 export default function FeaturesPage() {
   return (
     <div className="min-h-screen flex flex-col">

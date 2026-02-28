@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { ClerkProvider } from "@clerk/nextjs"
 
+import { ClerkProviderWrapper } from "@/components/ClerkWrapper"
 import { AuthProvider } from "@/contexts/AuthContext"
 import "./globals.css"
 
@@ -18,12 +18,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProviderWrapper>
       <AuthProvider>
         <html lang="en" suppressHydrationWarning>
           <body className={inter.className}>{children}</body>
         </html>
       </AuthProvider>
-    </ClerkProvider>
+    </ClerkProviderWrapper>
   )
 }
