@@ -16,24 +16,24 @@ type BatchRepository struct {
 
 // BatchModel is the database model for batches
 type BatchModel struct {
-	ID          string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	UserID      string `gorm:"index;not null"`
-	Name        string `gorm:"not null"`
-	Description string
-	Status      string `gorm:"not null;default:'pending'"`
-	TotalVideos int    `gorm:"not null;default:0"`
-	Completed   int    `gorm:"not null;default:0"`
-	Failed      int    `gorm:"not null;default:0"`
-	InProgress  int    `gorm:"not null;default:0"`
-	Progress    float64 `gorm:"default:0"`
-	Error       string
-	ConfigJSON  string `gorm:"type:jsonb"`
+	ID           string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	UserID       string `gorm:"index;not null"`
+	Name         string `gorm:"not null"`
+	Description  string
+	Status       string  `gorm:"not null;default:'pending'"`
+	TotalVideos  int     `gorm:"not null;default:0"`
+	Completed    int     `gorm:"not null;default:0"`
+	Failed       int     `gorm:"not null;default:0"`
+	InProgress   int     `gorm:"not null;default:0"`
+	Progress     float64 `gorm:"default:0"`
+	Error        string
+	ConfigJSON   string `gorm:"type:jsonb"`
 	MetadataJSON string `gorm:"type:jsonb"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	StartedAt   *time.Time
-	CompletedAt *time.Time
-	Videos      []BatchVideoModel `gorm:"foreignKey:BatchID;constraint:OnDelete:CASCADE;"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	StartedAt    *time.Time
+	CompletedAt  *time.Time
+	Videos       []BatchVideoModel `gorm:"foreignKey:BatchID;constraint:OnDelete:CASCADE;"`
 }
 
 // TableName specifies the table name
@@ -43,20 +43,20 @@ func (BatchModel) TableName() string {
 
 // BatchVideoModel is the database model for batch videos
 type BatchVideoModel struct {
-	ID           string  `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	BatchID      string  `gorm:"index;not null"`
-	Title        string  `gorm:"not null"`
-	Description  string
-	Status       string  `gorm:"not null;default:'pending'"`
-	TimelineID   string
-	Error        string
-	Progress     float64 `gorm:"default:0"`
-	ConfigJSON   string  `gorm:"type:jsonb"`
-	ResultJSON   string  `gorm:"type:jsonb"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	StartedAt    *time.Time
-	CompletedAt  *time.Time
+	ID          string  `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	BatchID     string  `gorm:"index;not null"`
+	Title       string  `gorm:"not null"`
+	Description string
+	Status      string  `gorm:"not null;default:'pending'"`
+	TimelineID  string
+	Error       string
+	Progress    float64 `gorm:"default:0"`
+	ConfigJSON  string  `gorm:"type:jsonb"`
+	ResultJSON  string  `gorm:"type:jsonb"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	StartedAt   *time.Time
+	CompletedAt *time.Time
 }
 
 // TableName specifies the table name
@@ -338,4 +338,12 @@ func (r *BatchRepository) videoToDomain(model *BatchVideoModel) *domain.BatchVid
 }
 
 // Ensure BatchRepository implements the interface
-var _ domain.BatchRepository = (*BatchRepository)(nil)
+type BatchRepositoryInterface interface {
+	Create(batch *domain.Batch) error
+	Get(id string) (*domain.Batch, error)
+	Update(batch *domain.Batch) error
+	List(userID string, limit, offset int) ([]*domain.Batch, error)
+	Delete(id string) error
+}
+
+var _ BatchRepositoryInterface = (*BatchRepository)(nil)

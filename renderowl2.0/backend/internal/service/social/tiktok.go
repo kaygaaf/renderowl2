@@ -157,11 +157,13 @@ func (t *TikTokPlatform) UploadVideo(ctx context.Context, account *social.Social
 		}
 	}
 
-	// Get file info
-	fileInfo, err := os.Stat(req.VideoPath)
+	// Get file info (for future use with file size validation)
+	_, err := os.Stat(req.VideoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat video file: %w", err)
 	}
+	
+	// fileSize := fileInfo.Size() // Available for future size validation
 
 	// Initialize upload
 	initData := map[string]interface{}{

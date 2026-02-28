@@ -45,9 +45,9 @@ type BatchVideo struct {
 	Description string            `json:"description"`
 	Status      VideoStatus       `json:"status"`
 	TimelineID  string            `json:"timelineId,omitempty"`
-	Config      VideoConfig       `json:"config"`
-	Progress    float64           `json:"progress"`
 	Error       string            `json:"error,omitempty"`
+	Progress    float64           `json:"progress"`
+	Config      VideoConfig       `json:"config"`
 	Result      *VideoResult      `json:"result,omitempty"`
 	CreatedAt   time.Time         `json:"createdAt"`
 	UpdatedAt   time.Time         `json:"updatedAt"`
@@ -55,7 +55,7 @@ type BatchVideo struct {
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 }
 
-// VideoStatus represents the status of a video in a batch
+// VideoStatus represents the status of a single video
 type VideoStatus string
 
 const (
@@ -64,47 +64,50 @@ const (
 	VideoStatusProcessing VideoStatus = "processing"
 	VideoStatusCompleted  VideoStatus = "completed"
 	VideoStatusFailed     VideoStatus = "failed"
+	VideoStatusSkipped    VideoStatus = "skipped"
 	VideoStatusCancelled  VideoStatus = "cancelled"
 )
 
-// BatchConfig contains configuration for batch processing
+// BatchConfig contains configuration for the batch
 type BatchConfig struct {
-	TemplateID       string                 `json:"templateId,omitempty"`
-	VideoStyle       string                 `json:"videoStyle,omitempty"`
-	ScriptSource     string                 `json:"scriptSource,omitempty"` // ai, custom, rss
-	CustomScripts    []string               `json:"customScripts,omitempty"`
-	RSSFeedURL       string                 `json:"rssFeedUrl,omitempty"`
-	AIConfig         map[string]interface{} `json:"aiConfig,omitempty"`
-	OutputSettings   OutputSettings         `json:"outputSettings"`
-	EnableScheduling bool                   `json:"enableScheduling"`
-	ScheduleTimes    []string               `json:"scheduleTimes,omitempty"`
-	PublishPlatforms []string               `json:"publishPlatforms,omitempty"`
+	TemplateID             string                 `json:"templateId,omitempty"`
+	ScriptStyle            string                 `json:"scriptStyle"`
+	Duration               int                    `json:"duration"`
+	VoiceID                string                 `json:"voiceId,omitempty"`
+	BackgroundMusic        bool                   `json:"backgroundMusic"`
+	AutoGenerateThumbnails bool                   `json:"autoGenerateThumbnails"`
+	Platforms              []string               `json:"platforms,omitempty"`
+	ParallelProcessing     bool                   `json:"parallelProcessing"`
+	MaxConcurrent          int                    `json:"maxConcurrent"`
+	RetryAttempts          int                    `json:"retryAttempts"`
+	CustomSettings         map[string]interface{} `json:"customSettings,omitempty"`
 }
 
 // VideoConfig contains configuration for a single video
 type VideoConfig struct {
-	Script      string                 `json:"script,omitempty"`
-	SceneConfig map[string]interface{} `json:"sceneConfig,omitempty"`
-	MediaURLs   []string               `json:"mediaUrls,omitempty"`
-	VoiceID     string                 `json:"voiceId,omitempty"`
-	Style       string                 `json:"style,omitempty"`
+	Topic          string   `json:"topic"`
+	Script         string   `json:"script,omitempty"`
+	Keywords       []string `json:"keywords,omitempty"`
+	Tone           string   `json:"tone,omitempty"`
+	TargetDuration int      `json:"targetDuration,omitempty"`
 }
 
 // VideoResult contains the result of video generation
 type VideoResult struct {
-	VideoURL    string            `json:"videoUrl"`
-	Thumbnail   string            `json:"thumbnail,omitempty"`
-	Duration    float64           `json:"duration"`
-	Format      string            `json:"format"`
-	Size        int64             `json:"size"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	TimelineID  string            `json:"timelineId,omitempty"`
+	VideoURL   string            `json:"videoUrl"`
+	Thumbnail  string            `json:"thumbnail,omitempty"`
+	Duration   float64           `json:"duration"`
+	Format     string            `json:"format"`
+	Size       int64             `json:"size"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+	TimelineID string            `json:"timelineId,omitempty"`
 }
 
-// OutputSettings contains output configuration
-type OutputSettings struct {
-	Format      string `json:"format"`
-	Resolution  string `json:"resolution"`
-	Quality     string `json:"quality"`
-	MaxDuration int    `json:"maxDuration"`
+// BatchRepository defines the interface for batch data storage
+type BatchRepository interface {
+	Create(batch *Batch) error
+	Get(id string) (*Batch, error)
+	Update(batch *Batch) error
+	List(userID string, limit, offset int) ([]*Batch, error)
+	Delete(id string) error
 }

@@ -296,7 +296,7 @@ func (y *YouTubePlatform) GetTrends(ctx context.Context, account *social.SocialA
 			Title:       video.Snippet.Title,
 			Description: video.Snippet.Description,
 			URL:         fmt.Sprintf("https://youtube.com/watch?v=%s", video.Id),
-			Volume:      video.Statistics.ViewCount,
+			Volume:      int64(video.Statistics.ViewCount),
 			Region:      region,
 			FetchedAt:   time.Now(),
 		})
