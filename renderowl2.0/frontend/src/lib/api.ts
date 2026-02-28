@@ -9,6 +9,9 @@ export const api = axios.create({
   },
 })
 
+// Alias for compatibility
+export const apiClient = api
+
 // Add auth token to requests
 api.interceptors.request.use((config) => {
   // Get token from your auth system (Clerk, etc.)
