@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"renderowl-api/internal/domain"
 )
 
 // OptimizerService handles content optimization based on performance analytics
@@ -30,9 +31,9 @@ type AnalyticsRepository interface {
 
 // TimelineRepository defines the interface for timeline data
 type TimelineRepository interface {
-	Get(id string, userID string) (*Timeline, error)
-	Update(timeline *Timeline) error
-	ListByUser(userID string, limit, offset int) ([]*Timeline, error)
+	Get(id string, userID string) (*domain.Timeline, error)
+	Update(timeline *domain.Timeline) error
+	ListByUser(userID string, limit, offset int) ([]*domain.Timeline, error)
 }
 
 // SocialService handles social media operations
@@ -686,15 +687,6 @@ func extractTopic(title string) string {
 		return words[0] + " " + words[1]
 	}
 	return title
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 func findMaxKey(m map[string]int) string {

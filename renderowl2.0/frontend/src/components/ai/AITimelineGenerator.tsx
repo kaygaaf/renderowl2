@@ -108,6 +108,11 @@ export function AITimelineGenerator({
         timelineId = newProject.id
       }
 
+      if (!timelineId) {
+        toast.error("Failed to create timeline")
+        return
+      }
+
       // Create tracks for the timeline
       const videoTrack = await trackApi.create(timelineId, {
         name: "AI Video",

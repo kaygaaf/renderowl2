@@ -52,12 +52,33 @@ export default function EditorPageClient() {
           const loadedTracks = await trackApi.list(projectId)
           
           // Load clips for each track
-          const tracksWithClips = await Promise.all(
-            loadedTracks.map(async (track: TimelineTrack) => {
-              const clips = await clipApi.list(projectId)
+          const tracksWithClips: TimelineTrack[] = await Promise.all(
+            loadedTracks.map(async (track: any) => {
+              const apiClips = await clipApi.list(projectId)
+              // Map API clips to Remotion TimelineClip format
+              const remotionClips: TimelineClip[] = apiClips
+                .filter((clip: any) => clip.trackId === track.id)
+                .map((clip: any) => ({
+                  id: clip.id,
+                  trackId: clip.trackId,
+                  startTime: clip.startTime,
+                  endTime: clip.startTime + clip.duration,
+                  assetType: clip.type,
+                  assetUrl: clip.src,
+                  textContent: clip.text,
+                  position: clip.metadata?.position || { x: 0, y: 0 },
+                  scale: clip.metadata?.scale || 1,
+                  opacity: clip.metadata?.opacity ?? 1,
+                  transition: clip.metadata?.transition || 'none',
+                }))
               return {
-                ...track,
-                clips: clips.filter((clip: TimelineClip) => clip.trackId === track.id)
+                id: track.id,
+                name: track.name,
+                type: track.type as 'video' | 'audio' | 'text',
+                order: track.order,
+                clips: remotionClips,
+                muted: track.muted,
+                solo: false,
               }
             })
           )

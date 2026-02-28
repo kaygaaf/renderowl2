@@ -17,8 +17,10 @@ interface Batch {
   totalVideos: number
   completed: number
   failed: number
+  inProgress: number
   progress: number
   createdAt: string
+  updatedAt: string
 }
 
 export function BatchContent() {
@@ -32,7 +34,13 @@ export function BatchContent() {
       const response = await fetch("/api/v1/batch")
       if (response.ok) {
         const data = await response.json()
-        setBatches(data.data || [])
+        // Map API data to ensure all required fields are present
+        const mappedBatches: Batch[] = (data.data || []).map((b: any) => ({
+          ...b,
+          inProgress: b.inProgress ?? 0,
+          updatedAt: b.updatedAt || b.createdAt || new Date().toISOString(),
+        }))
+        setBatches(mappedBatches)
       }
     } catch (error) {
       console.error("Failed to fetch batches:", error)

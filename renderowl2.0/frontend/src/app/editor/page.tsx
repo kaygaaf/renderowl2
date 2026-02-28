@@ -130,21 +130,21 @@ export default function IntegratedEditorPage() {
       for (const scene of template.data.scenes) {
         if (scene.image_url || scene.thumbnail) {
           await clipApi.create(newProject.id, {
-            track_id: videoTrack.id,
-            start_time: currentTime,
-            end_time: currentTime + (scene.duration || 5),
-            asset_type: "image",
-            asset_url: scene.image_url || scene.thumbnail
+            trackId: videoTrack.id,
+            startTime: currentTime,
+            endTime: currentTime + (scene.duration || 5),
+            assetType: "image",
+            assetUrl: scene.image_url || scene.thumbnail
           })
         }
         
         if (scene.text_content || scene.title) {
           await clipApi.create(newProject.id, {
-            track_id: textTrack.id,
-            start_time: currentTime,
-            end_time: currentTime + (scene.duration || 5),
-            asset_type: "text",
-            text_content: scene.text_content || scene.title
+            trackId: textTrack.id,
+            startTime: currentTime,
+            endTime: currentTime + (scene.duration || 5),
+            assetType: "text",
+            textContent: scene.text_content || scene.title
           })
         }
         

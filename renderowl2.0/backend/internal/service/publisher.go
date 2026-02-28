@@ -7,15 +7,27 @@ import (
 	"log"
 	"time"
 
-	"renderowl-api/internal/domain/social"
+	socialdomain "renderowl-api/internal/domain/social"
 	"renderowl-api/internal/scheduler"
+	socialsvc "renderowl-api/internal/service/social"
 )
+
+// PostRepository defines post storage operations
+type PostRepository interface {
+	Create(ctx context.Context, post *socialdomain.ScheduledPost) error
+	GetByID(ctx context.Context, id string) (*socialdomain.ScheduledPost, error)
+	GetByUser(ctx context.Context, userID string, limit, offset int) ([]*socialdomain.ScheduledPost, error)
+	GetPending(ctx context.Context, before string) ([]*socialdomain.ScheduledPost, error)
+	Update(ctx context.Context, post *socialdomain.ScheduledPost) error
+	UpdateStatus(ctx context.Context, id string, status socialdomain.PostStatus, errorMsg string) error
+	Delete(ctx context.Context, id string) error
+}
 
 // Publisher handles automatic publishing of scheduled content
 type Publisher struct {
-	socialService *social.Service
+	socialService *socialsvc.Service
 	scheduler     *scheduler.Scheduler
-	postRepo      social.PostRepository
+	postRepo      PostRepository
 }
 
 // PublishJobData contains data for a publish job
@@ -31,9 +43,9 @@ type PublishJobData struct {
 
 // NewPublisher creates a new publisher instance
 func NewPublisher(
-	socialService *social.Service,
+	socialService *socialsvc.Service,
 	scheduler *scheduler.Scheduler,
-	postRepo social.PostRepository,
+	postRepo PostRepository,
 ) *Publisher {
 	return &Publisher{
 		socialService: socialService,
@@ -50,9 +62,9 @@ func (p *Publisher) Initialize() {
 }
 
 // SchedulePublish schedules a video for publishing
-func (p *Publisher) SchedulePublish(ctx context.Context, post *social.ScheduledPost) error {
+func (p *Publisher) SchedulePublish(ctx context.Context, post *socialdomain.ScheduledPost) error {
 	// Update post status
-	post.Status = social.PostStatusScheduled
+	post.Status = socialdomain.PostStatusScheduled
 	if err := p.postRepo.Update(ctx, post); err != nil {
 		return fmt.Errorf("failed to update post: %w", err)
 	}
@@ -94,7 +106,7 @@ func (p *Publisher) PublishNow(ctx context.Context, postID string) error {
 	}
 
 	// Update status to publishing
-	post.Status = social.PostStatusPublishing
+	post.Status = socialdomain.PostStatusPublishing
 	if err := p.postRepo.Update(ctx, post); err != nil {
 		return err
 	}
@@ -108,7 +120,7 @@ func (p *Publisher) PublishNow(ctx context.Context, postID string) error {
 }
 
 // BulkSchedule schedules multiple posts at once
-func (p *Publisher) BulkSchedule(ctx context.Context, posts []*social.ScheduledPost) error {
+func (p *Publisher) BulkSchedule(ctx context.Context, posts []*socialdomain.ScheduledPost) error {
 	for _, post := range posts {
 		if err := p.SchedulePublish(ctx, post); err != nil {
 			log.Printf("Failed to schedule post %s: %v", post.ID, err)
@@ -119,7 +131,7 @@ func (p *Publisher) BulkSchedule(ctx context.Context, posts []*social.ScheduledP
 }
 
 // GetPublishingQueue returns the current publishing queue
-func (p *Publisher) GetPublishingQueue(ctx context.Context, userID string) ([]*social.ScheduledPost, error) {
+func (p *Publisher) GetPublishingQueue(ctx context.Context, userID string) ([]*socialdomain.ScheduledPost, error) {
 	// Get pending posts
 	return p.postRepo.GetByUser(ctx, userID, 100, 0)
 }
@@ -131,12 +143,12 @@ func (p *Publisher) RetryFailedPost(ctx context.Context, postID string) error {
 		return err
 	}
 
-	if post.Status != social.PostStatusFailed {
+	if post.Status != socialdomain.PostStatusFailed {
 		return fmt.Errorf("post is not in failed status")
 	}
 
 	// Reset status and reschedule
-	post.Status = social.PostStatusScheduled
+	post.Status = socialdomain.PostStatusScheduled
 	post.ErrorMsg = ""
 
 	if err := p.postRepo.Update(ctx, post); err != nil {
@@ -155,12 +167,12 @@ func (p *Publisher) handlePublishJob(ctx context.Context, job *scheduler.Job) er
 	}
 
 	// Update post status to publishing
-	if err := p.postRepo.UpdateStatus(ctx, data.PostID, social.PostStatusPublishing, ""); err != nil {
+	if err := p.postRepo.UpdateStatus(ctx, data.PostID, socialdomain.PostStatusPublishing, ""); err != nil {
 		return err
 	}
 
 	// Create upload request
-	req := &social.UploadRequest{
+	req := &socialdomain.UploadRequest{
 		VideoPath:   data.VideoPath,
 		Title:       data.Title,
 		Description: data.Description,
@@ -172,7 +184,7 @@ func (p *Publisher) handlePublishJob(ctx context.Context, job *scheduler.Job) er
 	resp, err := p.socialService.UploadVideo(ctx, data.AccountID, req)
 	if err != nil {
 		// Update post status to failed
-		p.postRepo.UpdateStatus(ctx, data.PostID, social.PostStatusFailed, err.Error())
+		p.postRepo.UpdateStatus(ctx, data.PostID, socialdomain.PostStatusFailed, err.Error())
 		return fmt.Errorf("upload failed: %w", err)
 	}
 
@@ -182,7 +194,7 @@ func (p *Publisher) handlePublishJob(ctx context.Context, job *scheduler.Job) er
 		if post.Platforms[i].AccountID == data.AccountID {
 			post.Platforms[i].PlatformPostID = resp.PlatformPostID
 			post.Platforms[i].PostURL = resp.PostURL
-			post.Platforms[i].Status = social.PostStatusPublished
+			post.Platforms[i].Status = socialdomain.PostStatusPublished
 			post.Platforms[i].PublishedAt = &[]time.Time{time.Now()}[0]
 			break
 		}
@@ -191,14 +203,14 @@ func (p *Publisher) handlePublishJob(ctx context.Context, job *scheduler.Job) er
 	// Check if all platforms are published
 	allPublished := true
 	for _, pp := range post.Platforms {
-		if pp.Status != social.PostStatusPublished {
+		if pp.Status != socialdomain.PostStatusPublished {
 			allPublished = false
 			break
 		}
 	}
 
 	if allPublished {
-		post.Status = social.PostStatusPublished
+		post.Status = socialdomain.PostStatusPublished
 		post.PublishedAt = &[]time.Time{time.Now()}[0]
 	}
 
@@ -220,7 +232,7 @@ func (p *Publisher) handleCrossPostJob(ctx context.Context, job *scheduler.Job) 
 		return err
 	}
 
-	req := &social.UploadRequest{
+	req := &socialdomain.UploadRequest{
 		VideoPath:   data.VideoPath,
 		Title:       data.Title,
 		Description: data.Description,
@@ -235,8 +247,8 @@ func (p *Publisher) handleCrossPostJob(ctx context.Context, job *scheduler.Job) 
 
 // Private methods
 
-func (p *Publisher) publishToPlatform(ctx context.Context, post *social.ScheduledPost, platformPost *social.PlatformPost) {
-	req := &social.UploadRequest{
+func (p *Publisher) publishToPlatform(ctx context.Context, post *socialdomain.ScheduledPost, platformPost *socialdomain.PlatformPost) {
+	req := &socialdomain.UploadRequest{
 		VideoPath:   post.Metadata["videoPath"].(string),
 		Title:       platformPost.CustomTitle,
 		Description: platformPost.CustomDesc,
@@ -246,7 +258,7 @@ func (p *Publisher) publishToPlatform(ctx context.Context, post *social.Schedule
 
 	resp, err := p.socialService.UploadVideo(ctx, platformPost.AccountID, req)
 	if err != nil {
-		platformPost.Status = social.PostStatusFailed
+		platformPost.Status = socialdomain.PostStatusFailed
 		platformPost.ErrorMsg = err.Error()
 		p.postRepo.Update(ctx, post)
 		return
@@ -254,7 +266,7 @@ func (p *Publisher) publishToPlatform(ctx context.Context, post *social.Schedule
 
 	platformPost.PlatformPostID = resp.PlatformPostID
 	platformPost.PostURL = resp.PostURL
-	platformPost.Status = social.PostStatusPublished
+	platformPost.Status = socialdomain.PostStatusPublished
 	now := time.Now()
 	platformPost.PublishedAt = &now
 
@@ -262,20 +274,20 @@ func (p *Publisher) publishToPlatform(ctx context.Context, post *social.Schedule
 }
 
 // FormatForPlatform formats content for a specific platform
-func FormatForPlatform(content string, platform social.SocialPlatform) string {
+func FormatForPlatform(content string, platform socialdomain.SocialPlatform) string {
 	switch platform {
-	case social.PlatformTwitter:
+	case socialdomain.PlatformTwitter:
 		// Twitter has 280 character limit
 		if len(content) > 280 {
 			return content[:277] + "..."
 		}
-	case social.PlatformInstagram:
+	case socialdomain.PlatformInstagram:
 		// Instagram works well with hashtags
 		// Already handled in the platform-specific logic
-	case social.PlatformLinkedIn:
+	case socialdomain.PlatformLinkedIn:
 		// LinkedIn prefers professional tone
 		// Content can be longer
-	case social.PlatformTikTok:
+	case socialdomain.PlatformTikTok:
 		// TikTok description limit is 2200 characters
 		if len(content) > 2200 {
 			return content[:2197] + "..."
