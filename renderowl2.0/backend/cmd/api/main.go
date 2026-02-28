@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
@@ -12,7 +14,10 @@ import (
 	"renderowl-api/internal/handlers"
 	"renderowl-api/internal/middleware"
 	"renderowl-api/internal/repository"
+	"renderowl-api/internal/scheduler"
 	"renderowl-api/internal/service"
+	"renderowl-api/internal/service/social"
+	socialhandlers "renderowl-api/internal/handlers/social"
 )
 
 func main() {
@@ -41,11 +46,33 @@ func main() {
 	trackRepo := repository.NewTrackRepository(db)
 	templateRepo := repository.NewTemplateRepository(db)
 	analyticsRepo := repository.NewAnalyticsRepository(db)
+	socialAccountRepo := repository.NewSocialAccountRepository(db)
+	socialPostRepo := repository.NewSocialPostRepository(db)
+	socialAnalyticsRepo := repository.NewSocialAnalyticsRepository(db)
 
 	// Seed default templates
 	if err := templateRepo.SeedDefaultTemplates(); err != nil {
 		log.Printf("Warning: Failed to seed default templates: %v", err)
 	}
+
+	// Initialize scheduler
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	sched := scheduler.NewScheduler(redisAddr, os.Getenv("REDIS_PASSWORD"), 0)
+
+	// Initialize social media service
+	socialRegistry := social.NewPlatformRegistry()
+	socialService := social.NewService(socialRegistry, socialAccountRepo, socialPostRepo, socialAnalyticsRepo)
+	socialService.InitializePlatforms()
+
+	// Initialize publisher
+	publisher := service.NewPublisher(socialService, sched, socialPostRepo)
+	publisher.Initialize()
+
+	// Start scheduler in background
+	go sched.ProcessJobs(context.Background())
 
 	// Initialize services
 	timelineService := service.NewTimelineService(timelineRepo)
@@ -65,6 +92,7 @@ func main() {
 	healthHandler := handlers.NewHealthHandler(db)
 	aiHandler := handlers.NewAIHandler(aiScriptService, aiSceneService, ttsService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
+	socialHandler := socialhandlers.NewSocialHandler(socialService, publisher, sched)
 
 	// Setup router
 	r := gin.Default()
@@ -132,6 +160,25 @@ func main() {
 		// Analytics tracking endpoints
 		api.POST("/analytics/track/view", analyticsHandler.TrackView)
 		api.POST("/analytics/track/engagement", analyticsHandler.TrackEngagement)
+
+		// Social Media endpoints
+		api.GET("/social/platforms", socialHandler.GetPlatforms)
+		api.GET("/social/accounts", socialHandler.GetAccounts)
+		api.GET("/social/accounts/:id", socialHandler.GetAccount)
+		api.DELETE("/social/accounts/:id", socialHandler.DisconnectAccount)
+		api.GET("/social/connect/:platform", socialHandler.GetAuthURL)
+		api.POST("/social/callback/:platform", socialHandler.HandleCallback)
+		api.POST("/social/upload", socialHandler.UploadVideo)
+		api.POST("/social/crosspost", socialHandler.CrossPost)
+		api.POST("/social/schedule", socialHandler.SchedulePost)
+		api.GET("/social/schedule", socialHandler.GetScheduledPosts)
+		api.DELETE("/social/schedule/:id", socialHandler.CancelScheduledPost)
+		api.POST("/social/publish/:id", socialHandler.PublishNow)
+		api.POST("/social/retry/:id", socialHandler.RetryPost)
+		api.GET("/social/queue", socialHandler.GetPublishingQueue)
+		api.GET("/social/analytics/:accountId", socialHandler.GetAnalytics)
+		api.GET("/social/trends/:accountId", socialHandler.GetTrends)
+		api.GET("/social/stats", socialHandler.GetQueueStats)
 	}
 
 	// Start server
@@ -159,5 +206,11 @@ func migrateDB(db *gorm.DB) error {
 		&domain.VideoPerformance{},
 		&domain.PlatformStats{},
 		&domain.WebhookEvent{},
+		// Social media models
+		&social.SocialAccount{},
+		&social.ScheduledPost{},
+		&social.PlatformPost{},
+		&social.AnalyticsData{},
+		&social.PlatformTrend{},
 	)
 }
