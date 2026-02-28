@@ -1,22 +1,12 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
+// middleware.ts - Demo mode: no authentication required
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/editor(.*)",
-  "/api/projects(.*)",
-  "/api/videos(.*)",
-])
-
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect()
-  }
-})
+export default function middleware(request: NextRequest) {
+  // Allow all requests - demo mode
+  return NextResponse.next()
+}
 
 export const config = {
-  matcher: [
-    "/((?!.*\\..*|_next).*)",
-    "/",
-    "/(api|trpc)(.*)",
-  ],
+  matcher: [],
 }
