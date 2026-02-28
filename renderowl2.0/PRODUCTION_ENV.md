@@ -31,6 +31,57 @@
 
 ---
 
+## 🧪 Staging Infrastructure
+
+### Project Details
+- **Project Name:** Renderowl2 Staging
+- **Project UUID:** `rc0oo084sswkkokgws8sk8ss`
+- **Environment:** staging
+- **Server:** localhost (roog0k800wc4ocoko8wgoscs)
+
+### Applications
+
+| Service | UUID | Domain | Repository | Port | Status |
+|---------|------|--------|------------|------|--------|
+| Frontend | `mocsks4gcgggwgss080s80ws` | https://staging.renderowl.com | kaygaaf/renderowl2-frontend | 3000 | ✅ Running |
+| Backend | `kk88gwo8wkk040o8ocs48gcw` | https://staging-api.renderowl.com | kaygaaf/renderowl2-backend | 8080 | ✅ Running |
+
+### Databases
+
+| Type | UUID | Name | Internal URL |
+|------|------|------|--------------|
+| PostgreSQL | `r4cs0sscwk08ss0400w0wgs0` | renderowl2-staging-db | postgres://postgres:...@r4cs0sscwk08ss0400w0wgs0:5432/postgres |
+| Redis | `dsc48cgc4oowwokw88c4s004` | renderowl2-staging-redis | redis://default:...@dsc48cgc4oowwokw88c4s004:6379/0 |
+
+### Environment Variables
+
+**Frontend:**
+```
+NEXT_PUBLIC_API_URL=https://staging-api.renderowl.com
+NEXT_PUBLIC_APP_URL=https://staging.renderowl.com
+```
+
+**Backend:**
+```
+ENVIRONMENT=staging
+PORT=8080
+DATABASE_URL=<configured>
+REDIS_URL=<configured>
+ALLOWED_ORIGINS=https://staging.renderowl.com
+```
+
+### Deployment
+- **Auto-deploy:** On push to `main` branch
+- **Manual deploy:** `mcporter call coolify.deploy tag_or_uuid=mocsks4gcgggwgss080s80ws force=true`
+
+### Verification
+- ✅ https://staging.renderowl.com - Frontend loads (HTTP 200)
+- ✅ https://staging-api.renderowl.com/health - API responds (HTTP 200)
+- ✅ SSL certificates valid (Cloudflare)
+- ✅ CORS configured correctly
+
+---
+
 ## 🔐 Required GitHub Secrets
 
 Add these secrets to the GitHub repository (`kaygaaf/renderowl2.0`):

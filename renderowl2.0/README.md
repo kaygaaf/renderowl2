@@ -171,8 +171,8 @@ Automatically deployed on push to `develop` branch:
 ```
 
 **URLs:**
-- Frontend: https://staging.renderowl.app
-- API: https://api-staging.renderowl.app
+- Frontend: https://staging.renderowl.com
+- API: https://staging-api.renderowl.com
 
 ### Production
 
@@ -187,8 +187,8 @@ Requires manual trigger with confirmation:
 ```
 
 **URLs:**
-- Frontend: https://renderowl.app
-- API: https://api.renderowl.app
+- Frontend: https://app.renderowl.com
+- API: https://api.renderowl.com
 
 ---
 
