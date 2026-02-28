@@ -10,16 +10,17 @@
  * - Download exported videos
  */
 
-import { 
+import type { 
   ExportJob, 
   ExportSettings, 
   ExportRequest, 
   ExportStatus,
   TimelineTrack,
+  TimelineClip,
   CaptionSegment,
+  CaptionStyle,
   Asset
-} from '@/types/integration';
-import { CaptionStyle, TimelineClip } from '@/types/timeline';
+} from '@/types';
 
 // ============================================================================
 // Export API Client

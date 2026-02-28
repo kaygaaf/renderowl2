@@ -10,13 +10,13 @@
  * - Thumbnail generation
  */
 
-import { 
+import type { 
   Asset, 
   AssetType, 
   AssetStatus, 
   AssetUploadRequest, 
   AssetUploadResponse 
-} from '@/types/integration';
+} from '@/types';
 
 // ============================================================================
 // Asset API Client
@@ -308,7 +308,7 @@ class UploadManager {
     const queue = [...requests];
     const inProgress = new Set<Promise<void>>();
 
-    const processNext = async (): Promise<void> {
+    const processNext = async (): Promise<void> => {
       const request = queue.shift();
       if (!request) return;
 

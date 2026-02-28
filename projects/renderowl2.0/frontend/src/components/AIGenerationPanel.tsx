@@ -135,7 +135,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium flex items-center gap-2">
-            <Clock className="w-4 h-4" /
+            <Clock className="w-4 h-4" />
             Duration: {duration}s
           </label>
         </div>
@@ -177,7 +177,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       {/* Target Audience */}
       <div className="space-y-2">
         <label className="text-sm font-medium flex items-center gap-2">
-          <Users className="w-4 h-4" /
+          <Users className="w-4 h-4" />
           Target Audience (optional)
         </label>
         <input
@@ -194,7 +194,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       <div className="space-y-4 border rounded-lg p-4">
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-sm font-medium">
-            <Mic className="w-4 h-4" /
+            <Mic className="w-4 h-4" />
             Generate Voiceover
           </label>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -229,7 +229,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
 
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-sm font-medium">
-            <Image className="w-4 h-4" /
+            <Image className="w-4 h-4" />
             Find Stock Images
           </label>
           <label className="relative inline-flex items-center cursor-pointer">

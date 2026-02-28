@@ -11,25 +11,12 @@ export {
   assignImagesToScenes,
   AVAILABLE_VOICES,
 } from './ai';
-export type {
-  AIScriptScene,
-  AIScript,
-  AIVoiceover,
-  AIGeneratedAsset,
-  AIGenerationRequest,
-  AITimelineIntegration,
-  ScriptToTimelineOptions,
-  VoiceoverIntegration,
-} from './ai';
 
 // Template Integration
 export {
   templateService,
   BUILT_IN_TEMPLATES,
   useTemplates,
-} from './templates';
-export type {
-  TemplateApplyResult,
 } from './templates';
 
 // Export Integration
@@ -42,10 +29,6 @@ export {
   useExport,
   EXPORT_PRESETS,
 } from './export';
-export type {
-  RemotionComposition,
-  WebhookPayload,
-} from './export';
 
 // Asset Integration
 export {
@@ -55,17 +38,60 @@ export {
   useAssetUpload,
   useAssetLibrary,
 } from './assets';
-export type {
-  UploadTask,
-  AssetLibraryFilters,
-} from './assets';
 
 // Orchestrator
 export {
   orchestrator,
   useIntegration,
 } from './orchestrator';
+
+// Types - exported from @/types
 export type {
+  // AI
+  AIScriptScene,
+  AIScript,
+  AIVoiceover,
+  AIGeneratedAsset,
+  AIGenerationRequest,
+  
+  // Templates
+  Template,
+  TemplateVariable,
+  TemplateClipConfig,
+  TemplateWatermarkConfig,
+  TemplateApplyResult,
+  
+  // Assets
+  Asset,
+  AssetType,
+  AssetStatus,
+  AssetUploadRequest,
+  AssetUploadResponse,
+  UploadTask,
+  AssetLibraryFilters,
+  
+  // Export
+  ExportFormat,
+  ExportCodec,
+  ExportStatus,
+  ExportSettings,
+  ExportJob,
+  ExportRequest,
+  RemotionComposition,
+  WebhookPayload,
+  
+  // User Flow
+  UserFlowStep,
+  UserFlowState,
   ProjectContext,
   EditorState,
-} from './orchestrator';
+  
+  // Timeline
+  TimelineClip,
+  TimelineTrack,
+  TimelineState,
+  TimelineActions,
+  CaptionStyle,
+  HighlightMode,
+  WordEntryAnimation,
+} from '@/types';

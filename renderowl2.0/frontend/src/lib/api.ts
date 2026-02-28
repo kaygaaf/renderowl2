@@ -311,4 +311,79 @@ export interface Voice {
   labels?: Record<string, string>
 }
 
+// API helper functions for analytics
+export const analyticsApi = {
+  // Get analytics overview
+  getOverview: async (days?: number) => {
+    const response = await api.get(`/analytics/overview${days ? `?days=${days}` : ""}`)
+    return response.data
+  },
+
+  // Get dashboard summary
+  getDashboardSummary: async () => {
+    const response = await api.get("/analytics/dashboard")
+    return response.data
+  },
+
+  // Get video performance
+  getVideoPerformance: async (limit?: number, offset?: number) => {
+    const params = new URLSearchParams()
+    if (limit) params.append("limit", limit.toString())
+    if (offset) params.append("offset", offset.toString())
+    const response = await api.get(`/analytics/videos?${params.toString()}`)
+    return response.data
+  },
+
+  // Get platform breakdown
+  getPlatformBreakdown: async (days?: number) => {
+    const response = await api.get(`/analytics/platforms${days ? `?days=${days}` : ""}`)
+    return response.data
+  },
+
+  // Get engagement metrics
+  getEngagementMetrics: async (days?: number) => {
+    const response = await api.get(`/analytics/engagement${days ? `?days=${days}` : ""}`)
+    return response.data
+  },
+
+  // Get user growth
+  getUserGrowth: async (days?: number) => {
+    const response = await api.get(`/analytics/growth${days ? `?days=${days}` : ""}`)
+    return response.data
+  },
+
+  // Export analytics data
+  exportAnalytics: async (format: "json" | "csv" = "json", startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams()
+    params.append("format", format)
+    if (startDate) params.append("start_date", startDate)
+    if (endDate) params.append("end_date", endDate)
+    
+    const response = await api.get(`/analytics/export?${params.toString()}`, {
+      responseType: "blob",
+    })
+    return response.data
+  },
+
+  // Track a view
+  trackView: async (data: { video_id: string; platform: string; user_id?: string }) => {
+    const response = await api.post("/analytics/track/view", data)
+    return response.data
+  },
+
+  // Track engagement
+  trackEngagement: async (data: {
+    video_id: string
+    platform: string
+    likes?: number
+    comments?: number
+    shares?: number
+    saves?: number
+  }) => {
+    const response = await api.post("/analytics/track/engagement", data)
+    return response.data
+  },
+}
+
 export default api
+export { api as apiClient }

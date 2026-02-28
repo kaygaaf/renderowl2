@@ -6,20 +6,22 @@
  * Landing → Signup → Dashboard → Template/AI → Editor → Voiceover → Export → Download
  */
 
-import { 
+import type { 
   AIScript, 
   AIGenerationRequest, 
   Template, 
+  TemplateApplyResult,
   TimelineTrack, 
+  TimelineClip,
   ExportJob,
   ExportSettings,
   UserFlowStep,
   UserFlowState,
-  Asset
-} from '@/types/integration';
-import { CaptionStyle } from '@/types/timeline';
+  Asset,
+  CaptionStyle
+} from '@/types';
 import { aiService, scriptToTimeline, generateVoiceoversForScript } from './ai';
-import { templateService, TemplateApplyResult } from './templates';
+import { templateService } from './templates';
 import { exportService, timelineToRemotionRequest, getExportPreset } from './export';
 import { assetLibrary, uploadManager } from './assets';
 import { useTimelineStore } from '@/store/timelineStore';

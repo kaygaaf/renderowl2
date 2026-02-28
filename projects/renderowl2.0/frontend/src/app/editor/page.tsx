@@ -155,7 +155,7 @@ export default function EditorPage() {
             Back
           </button>
           
-          <div className="h-6 w-px bg-border" /
+          <div className="h-6 w-px bg-border" />
           
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
@@ -181,7 +181,7 @@ export default function EditorPage() {
             <Download className="w-4 h-4" />
             Export
           </button>
-        </div㸤.116.43.137%>
+        </div>
       </header>
 
       {/* Main Content */}

@@ -9,17 +9,18 @@
  * - Convert AI output to Timeline clips
  */
 
-import { 
+import type { 
   AIScript, 
   AIScriptScene, 
   AIGenerationRequest, 
   AIVoiceover,
   AIGeneratedAsset,
-  CaptionSegment 
-} from '@/types/integration';
-import { TimelineTrack, TimelineClip } from '@/types/timeline';
+  CaptionSegment,
+  TimelineTrack,
+  TimelineClip,
+  CaptionStyle
+} from '@/types';
 import { api } from '@/lib/api';
-import { CaptionStyle } from '@/types/timeline';
 
 // ============================================================================
 // API Client for AI Services
@@ -322,4 +323,17 @@ export interface AITimelineIntegration {
   tracks: TimelineTrack[];
   captionStyle: CaptionStyle;
   voiceovers: Map<string, AIVoiceover>;
+}
+
+export interface ScriptToTimelineOptions {
+  includeVoiceover: boolean;
+  includeImages: boolean;
+  captionStyle?: Partial<CaptionStyle>;
+  defaultImageDuration?: number;
+}
+
+export interface VoiceoverIntegration {
+  voiceId: string;
+  voiceName: string;
+  previewUrl?: string;
 }

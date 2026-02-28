@@ -2,6 +2,35 @@
  * Timeline Types for Renderowl 2.0
  */
 
+// Caption Style Types
+export type HighlightMode = 'color' | 'pill' | 'underline' | 'glow' | 'fill';
+export type WordEntryAnimation = 'none' | 'fade' | 'pop' | 'slideUp' | 'scale';
+
+export interface CaptionStyle {
+  maxCharsPerLine?: number;
+  maxLines?: number;
+  fontFamily?: string;
+  fontSize?: number;
+  lineHeight?: number;
+  textColor?: string;
+  highlightColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  paddingX?: number;
+  paddingY?: number;
+  borderRadius?: number;
+  bottomOffset?: number;
+  highlightMode?: HighlightMode;
+  highlightTransitionMs?: number;
+  highlightPillColor?: string;
+  highlightScale?: number;
+  wordEntryAnimation?: WordEntryAnimation;
+  wordEntryDurationMs?: number;
+  captionTransitionMs?: number;
+}
+
 export interface TimelineClip {
   id: string;
   name: string;

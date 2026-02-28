@@ -2,15 +2,17 @@
   "/_not-found/page": "app/_not-found/page.js",
   "/api/render/route": "app/api/render/route.js",
   "/api/health/route": "app/api/health/route.js",
+  "/dashboard/analytics/page": "app/dashboard/analytics/page.js",
   "/editor/page": "app/editor/page.js",
+  "/templates/page": "app/templates/page.js",
+  "/auth/page": "app/auth/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/dashboard/billing/page": "app/dashboard/billing/page.js",
-  "/auth/page": "app/auth/page.js",
   "/dashboard/settings/page": "app/dashboard/settings/page.js",
+  "/dashboard/social/page": "app/dashboard/social/page.js",
+  "/dashboard/videos/page": "app/dashboard/videos/page.js",
   "/help/page": "app/help/page.js",
   "/page": "app/page.js",
-  "/dashboard/videos/page": "app/dashboard/videos/page.js",
-  "/templates/page": "app/templates/page.js",
-  "/pricing/page": "app/pricing/page.js",
-  "/features/page": "app/features/page.js"
+  "/features/page": "app/features/page.js",
+  "/pricing/page": "app/pricing/page.js"
 }

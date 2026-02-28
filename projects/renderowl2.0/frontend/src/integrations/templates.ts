@@ -9,15 +9,15 @@
  * - Variable substitution
  */
 
-import { 
+import type { 
   Template, 
   TemplateVariable, 
   TemplateApplyResult,
   TimelineTrack, 
   TimelineClip,
+  CaptionStyle,
   Asset 
-} from '@/types/integration';
-import { CaptionStyle } from '@/types/timeline';
+} from '@/types';
 
 // ============================================================================
 // Built-in Templates

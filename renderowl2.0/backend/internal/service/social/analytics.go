@@ -5,9 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -42,7 +40,7 @@ type YouTubeMetrics struct {
 }
 
 // GetVideoMetrics retrieves metrics for a specific video
-func (y *YouTubeAnalytics) GetVideoMetrics(ctx context.Context, videoID string) (*YouTubeMetrics, error) {
+func (y *YouTubeAnalytics) GetVideoMetrics(ctx context.Context, videoID string) (interface{}, error) {
 	// In production, this would call the actual YouTube Analytics API
 	// For now, return mock data
 	return &YouTubeMetrics{
@@ -56,6 +54,11 @@ func (y *YouTubeAnalytics) GetVideoMetrics(ctx context.Context, videoID string) 
 		WatchTime:   5000,
 		PublishedAt: time.Now().AddDate(0, -1, 0),
 	}, nil
+}
+
+// GetUserMetrics implements the AnalyticsPlatform interface for YouTube
+func (y *YouTubeAnalytics) GetUserMetrics(ctx context.Context) (interface{}, error) {
+	return y.GetChannelMetrics(ctx, "")
 }
 
 // GetChannelMetrics retrieves overall channel metrics
@@ -139,7 +142,7 @@ type TikTokMetrics struct {
 }
 
 // GetVideoMetrics retrieves metrics for a specific video
-func (t *TikTokAnalytics) GetVideoMetrics(ctx context.Context, videoID string) (*TikTokMetrics, error) {
+func (t *TikTokAnalytics) GetVideoMetrics(ctx context.Context, videoID string) (interface{}, error) {
 	// Mock implementation
 	return &TikTokMetrics{
 		VideoID:      videoID,
@@ -156,7 +159,7 @@ func (t *TikTokAnalytics) GetVideoMetrics(ctx context.Context, videoID string) (
 }
 
 // GetUserMetrics retrieves user metrics
-func (t *TikTokAnalytics) GetUserMetrics(ctx context.Context) (*UserMetrics, error) {
+func (t *TikTokAnalytics) GetUserMetrics(ctx context.Context) (interface{}, error) {
 	// Mock implementation
 	return &UserMetrics{
 		Platform:       "tiktok",
@@ -208,11 +211,11 @@ type InstagramMetrics struct {
 	PublishedAt   time.Time `json:"timestamp"`
 }
 
-// GetMediaMetrics retrieves metrics for a specific media item
-func (i *InstagramInsights) GetMediaMetrics(ctx context.Context, mediaID string) (*InstagramMetrics, error) {
+// GetVideoMetrics retrieves metrics for a specific media item
+func (i *InstagramInsights) GetVideoMetrics(ctx context.Context, videoID string) (interface{}, error) {
 	// Mock implementation
 	return &InstagramMetrics{
-		MediaID:       mediaID,
+		MediaID:       videoID,
 		Caption:       "Sample Instagram Post",
 		MediaType:     "VIDEO",
 		Views:         25000,
@@ -238,6 +241,11 @@ func (i *InstagramInsights) GetAccountMetrics(ctx context.Context, accountID str
 		TotalLikes:    100000,
 		TotalComments: 5000,
 	}, nil
+}
+
+// GetUserMetrics implements the AnalyticsPlatform interface for Instagram
+func (i *InstagramInsights) GetUserMetrics(ctx context.Context) (interface{}, error) {
+	return i.GetAccountMetrics(ctx, "")
 }
 
 // AccountMetrics represents Instagram account metrics
@@ -320,29 +328,4 @@ func (p *PlatformClient) SyncMetrics(ctx context.Context) (map[string]interface{
 	}
 	
 	return results, nil
-}
-
-// makeRequest is a helper function for making HTTP requests
-func makeRequest(client *http.Client, method, url string, headers map[string]string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return nil, err
-	}
-	
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-	
-	return client.Do(req)
-}
-
-// buildURL is a helper function for building URLs with query parameters
-func buildURL(baseURL string, params map[string]string) string {
-	u, _ := url.Parse(baseURL)
-	q := u.Query()
-	for key, value := range params {
-		q.Set(key, value)
-	}
-	u.RawQuery = q.Encode()
-	return u.String()
 }
