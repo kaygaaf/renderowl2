@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Play, Clock, Layers, Search, Filter } from "lucide-react"
+import { Play, Clock, Layers, Search, Filter, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,151 +18,70 @@ const categories = [
   { id: "corporate", label: "Corporate" },
 ]
 
-const templates = [
-  {
-    id: "1",
-    name: "YouTube Intro Pro",
-    category: "youtube",
-    description: "Professional intro with animated logo and music",
-    duration: 8,
-    scenes: 4,
-    popularity: 98,
-    thumbnail: "🎬",
-    gradient: "from-red-500 to-pink-600",
-  },
-  {
-    id: "2",
-    name: "TikTok Viral Style",
-    category: "tiktok",
-    description: "Fast-paced edits perfect for viral content",
-    duration: 15,
-    scenes: 6,
-    popularity: 95,
-    thumbnail: "📱",
-    gradient: "from-purple-500 to-pink-500",
-  },
-  {
-    id: "3",
-    name: "Product Showcase",
-    category: "ads",
-    description: "Highlight your product features beautifully",
-    duration: 30,
-    scenes: 8,
-    popularity: 92,
-    thumbnail: "🛍️",
-    gradient: "from-blue-500 to-cyan-500",
-  },
-  {
-    id: "4",
-    name: "Instagram Reel",
-    category: "social",
-    description: "Vertical format optimized for Instagram",
-    duration: 15,
-    scenes: 5,
-    popularity: 90,
-    thumbnail: "📸",
-    gradient: "from-orange-500 to-pink-500",
-  },
-  {
-    id: "5",
-    name: "Tutorial Video",
-    category: "youtube",
-    description: "Clean layout for educational content",
-    duration: 60,
-    scenes: 12,
-    popularity: 88,
-    thumbnail: "📚",
-    gradient: "from-green-500 to-teal-500",
-  },
-  {
-    id: "6",
-    name: "App Promo",
-    category: "ads",
-    description: "Showcase your mobile application",
-    duration: 20,
-    scenes: 6,
-    popularity: 87,
-    thumbnail: "📲",
-    gradient: "from-indigo-500 to-purple-500",
-  },
-  {
-    id: "7",
-    name: "TikTok Dance",
-    category: "tiktok",
-    description: "Perfect for music and dance content",
-    duration: 15,
-    scenes: 4,
-    popularity: 94,
-    thumbnail: "💃",
-    gradient: "from-pink-500 to-rose-500",
-  },
-  {
-    id: "8",
-    name: "Company Overview",
-    category: "corporate",
-    description: "Professional corporate presentation",
-    duration: 45,
-    scenes: 10,
-    popularity: 85,
-    thumbnail: "🏢",
-    gradient: "from-slate-500 to-gray-600",
-  },
-  {
-    id: "9",
-    name: "Testimonial",
-    category: "ads",
-    description: "Customer testimonial format",
-    duration: 25,
-    scenes: 5,
-    popularity: 82,
-    thumbnail: "💬",
-    gradient: "from-yellow-500 to-orange-500",
-  },
-  {
-    id: "10",
-    name: "Unboxing Video",
-    category: "youtube",
-    description: "Classic unboxing experience",
-    duration: 40,
-    scenes: 8,
-    popularity: 89,
-    thumbnail: "📦",
-    gradient: "from-emerald-500 to-green-600",
-  },
-  {
-    id: "11",
-    name: "LinkedIn Promo",
-    category: "social",
-    description: "Professional social media content",
-    duration: 20,
-    scenes: 4,
-    popularity: 80,
-    thumbnail: "💼",
-    gradient: "from-blue-600 to-blue-800",
-  },
-  {
-    id: "12",
-    name: "Event Promo",
-    category: "ads",
-    description: "Promote your upcoming event",
-    duration: 30,
-    scenes: 7,
-    popularity: 86,
-    thumbnail: "🎉",
-    gradient: "from-violet-500 to-purple-600",
-  },
-]
+interface Template {
+  id: string
+  name: string
+  category: string
+  description: string
+  duration: number
+  scenes?: number
+  popularity: number
+  thumbnail: string
+  gradient: string
+  icon?: string
+}
 
 export function TemplatesGallery() {
   const [activeCategory, setActiveCategory] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch templates from API
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch('/api/v1/templates')
+        if (!response.ok) throw new Error('Failed to fetch')
+        const data = await response.json()
+        
+        // Transform API response to match component structure
+        const transformedTemplates = data.data?.map((t: Template & { scenes?: unknown[] }) => ({
+          ...t,
+          icon: t.icon || t.thumbnail,
+          scenes: Array.isArray(t.scenes) ? t.scenes.length : (t.scenes || 0),
+        })) || []
+        
+        setTemplates(transformedTemplates)
+      } catch (error) {
+        console.error('Error fetching templates:', error)
+        // Fallback to empty array
+        setTemplates([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchTemplates()
+  }, [])
 
   const filteredTemplates = templates.filter((template) => {
     const matchesCategory = activeCategory === "all" || template.category === activeCategory
-    const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         template.description.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = 
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesSearch
   })
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Loading templates...​</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -201,7 +120,7 @@ export function TemplatesGallery() {
           >
             {/* Thumbnail */}
             <div className={`relative aspect-video bg-gradient-to-br ${template.gradient} flex items-center justify-center`}>
-              <span className="text-6xl">{template.thumbnail}</span>
+              <span className="text-6xl">{template.icon || template.thumbnail}</span>
               
               {/* Hover Overlay */}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -232,7 +151,7 @@ export function TemplatesGallery() {
               <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                 <span className="flex items-center gap-1">
                   <Layers className="h-3 w-3" />
-                  {template.scenes} scenes
+                  {template.scenes || 0} scenes
                 </span>
                 <span>🔥 {template.popularity}% popular</span>
               </div>

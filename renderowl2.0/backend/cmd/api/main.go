@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"renderowl-api/internal/config"
+	"renderowl-api/internal/domain"
 	"renderowl-api/internal/handlers"
 	"renderowl-api/internal/middleware"
 	"renderowl-api/internal/repository"
@@ -39,6 +40,7 @@ func main() {
 	clipRepo := repository.NewClipRepository(db)
 	trackRepo := repository.NewTrackRepository(db)
 	templateRepo := repository.NewTemplateRepository(db)
+	analyticsRepo := repository.NewAnalyticsRepository(db)
 
 	// Seed default templates
 	if err := templateRepo.SeedDefaultTemplates(); err != nil {
@@ -53,6 +55,7 @@ func main() {
 	aiScriptService := service.NewAIScriptService()
 	aiSceneService := service.NewAISceneService()
 	ttsService := service.NewTTSService()
+	analyticsService := service.NewAnalyticsService(analyticsRepo)
 
 	// Initialize handlers
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
@@ -61,6 +64,7 @@ func main() {
 	templateHandler := handlers.NewTemplateHandler(templateService)
 	healthHandler := handlers.NewHealthHandler(db)
 	aiHandler := handlers.NewAIHandler(aiScriptService, aiSceneService, ttsService)
+	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 
 	// Setup router
 	r := gin.Default()
@@ -72,6 +76,9 @@ func main() {
 	r.GET("/health", healthHandler.HealthCheck)
 	r.GET("/health/ready", healthHandler.ReadinessCheck)
 	r.GET("/health/live", healthHandler.LivenessCheck)
+
+	// Webhook routes (public but with platform-specific validation)
+	r.POST("/webhooks/:platform", analyticsHandler.ReceiveWebhook)
 
 	// Protected API routes
 	api := r.Group("/api/v1")
@@ -112,6 +119,19 @@ func main() {
 		api.GET("/ai/image-sources", aiHandler.GetImageSources)
 		api.POST("/ai/voice", aiHandler.GenerateVoice)
 		api.GET("/ai/voices", aiHandler.ListVoices)
+
+		// Analytics endpoints
+		api.GET("/analytics/overview", analyticsHandler.GetOverview)
+		api.GET("/analytics/dashboard", analyticsHandler.GetDashboardSummary)
+		api.GET("/analytics/videos", analyticsHandler.GetVideoPerformance)
+		api.GET("/analytics/platforms", analyticsHandler.GetPlatformBreakdown)
+		api.GET("/analytics/engagement", analyticsHandler.GetEngagementMetrics)
+		api.GET("/analytics/growth", analyticsHandler.GetUserGrowth)
+		api.GET("/analytics/export", analyticsHandler.ExportAnalytics)
+		
+		// Analytics tracking endpoints
+		api.POST("/analytics/track/view", analyticsHandler.TrackView)
+		api.POST("/analytics/track/engagement", analyticsHandler.TrackEngagement)
 	}
 
 	// Start server
@@ -131,5 +151,13 @@ func migrateDB(db *gorm.DB) error {
 		&repository.ClipModel{},
 		&repository.TrackModel{},
 		&repository.TemplateModel{},
+		// Analytics models
+		&domain.AnalyticsView{},
+		&domain.AnalyticsEngagement{},
+		&domain.UserGrowth{},
+		&domain.Revenue{},
+		&domain.VideoPerformance{},
+		&domain.PlatformStats{},
+		&domain.WebhookEvent{},
 	)
 }
