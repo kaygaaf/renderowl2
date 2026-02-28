@@ -1,3 +1,15 @@
 {
-  "/api/health/route": "app/api/health/route.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/health/route": "app/api/health/route.js",
+  "/auth/page": "app/auth/page.js",
+  "/dashboard/billing/page": "app/dashboard/billing/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/settings/page": "app/dashboard/settings/page.js",
+  "/dashboard/videos/page": "app/dashboard/videos/page.js",
+  "/editor/page": "app/editor/page.js",
+  "/features/page": "app/features/page.js",
+  "/help/page": "app/help/page.js",
+  "/page": "app/page.js",
+  "/pricing/page": "app/pricing/page.js",
+  "/templates/page": "app/templates/page.js"
 }

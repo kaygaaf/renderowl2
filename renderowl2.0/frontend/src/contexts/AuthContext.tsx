@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 import { useUser, useAuth as useClerkAuth } from "@clerk/nextjs"
-import { timelineApi } from "@/lib/api"
+import { timelineApi, setTokenGetter } from "@/lib/api"
 
 interface Project {
   id: string
@@ -46,12 +46,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { user, isLoaded } = useUser()
-  const { signOut: clerkSignOut, isSignedIn } = useClerkAuth()
+  const { signOut: clerkSignOut, isSignedIn, getToken } = useClerkAuth()
   
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectsError, setProjectsError] = useState<string | null>(null)
+
+  // Set up the token getter for API calls
+  useEffect(() => {
+    if (getToken) {
+      setTokenGetter(getToken)
+    }
+  }, [getToken])
 
   // Map Clerk user to our UserData format
   useEffect(() => {

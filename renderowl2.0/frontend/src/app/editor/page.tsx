@@ -1,38 +1,137 @@
-import { auth } from "@clerk/nextjs/server"
-import { redirect } from "next/navigation"
-import { Navbar } from "@/components/layout/Navbar"
+"use client"
 
-export default async function EditorPage({
-  searchParams,
-}: {
-  searchParams: { template?: string; id?: string }
-}) {
-  const { userId } = await auth()
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { Navbar } from "@/components/layout/Navbar"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { timelineApi } from "@/lib/api"
+import { useAuth } from "@/contexts/AuthContext"
+import { Loader2, Save, ArrowLeft } from "lucide-react"
+
+export default function EditorPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { isSignedIn, isLoaded } = useAuth()
   
-  if (!userId) {
-    redirect("/auth?mode=login")
+  const templateId = searchParams.get("template")
+  const projectId = searchParams.get("id")
+  
+  const [projectName, setProjectName] = useState("Untitled Project")
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Redirect if not signed in
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push("/auth?mode=login")
+    }
+  }, [isLoaded, isSignedIn, router])
+
+  // Load existing project if editing
+  useEffect(() => {
+    if (projectId) {
+      const loadProject = async () => {
+        try {
+          const project = await timelineApi.get(projectId)
+          setProjectName(project.name || "Untitled Project")
+        } catch (error) {
+          console.error("Failed to load project:", error)
+          setSaveStatus("Failed to load project")
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      loadProject()
+    } else {
+      setIsLoading(false)
+      // Set default name based on template
+      if (templateId) {
+        const templateNames: Record<string, string> = {
+          "1": "YouTube Intro Project",
+          "2": "TikTok Viral Project",
+          "3": "Product Ad Project",
+        }
+        setProjectName(templateNames[templateId] || "New Project")
+      }
+    }
+  }, [projectId, templateId])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    setSaveStatus("Saving...")
+
+    try {
+      if (projectId) {
+        // Update existing project
+        await timelineApi.update(projectId, {
+          name: projectName,
+        })
+        setSaveStatus("Saved!")
+      } else {
+        // Create new project
+        const newProject = await timelineApi.create({
+          name: projectName,
+          description: templateId ? `Created from template ${templateId}` : "",
+          duration: 30,
+        })
+        setSaveStatus("Created!")
+        // Redirect to edit the new project
+        router.push(`/editor?id=${newProject.id}`)
+      }
+    } catch (error: any) {
+      console.error("Failed to save project:", error)
+      setSaveStatus(error.response?.data?.error || "Failed to save")
+    } finally {
+      setIsSaving(false)
+      // Clear status after 3 seconds
+      setTimeout(() => setSaveStatus(""), 3000)
+    }
+  }
+
+  if (!isLoaded || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  if (!isSignedIn) {
+    return null // Will redirect
   }
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar user={{ name: "User", email: "user@example.com" }} />
+      <Navbar />
       
       <main className="flex-1 pt-16">
         <div className="h-[calc(100vh-4rem)] flex">
           {/* Left Sidebar - Assets */}
           <div className="w-64 border-r bg-muted/50 flex flex-col">
             <div className="p-4 border-b">
+              <Link 
+                href="/dashboard" 
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
+              </Link>
+            </div>
+            <div className="p-4 border-b">
               <h3 className="font-semibold">Assets</h3>
             </div>
             <div className="p-4 space-y-2">
-              <div className="h-20 rounded bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center">
-                🖼️
+              <div className="h-20 rounded bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center cursor-pointer hover:ring-2 ring-blue-500">
+                🖼️ Images
               </div>
-              <div className="h-20 rounded bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center">
-                🎵
+              <div className="h-20 rounded bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center cursor-pointer hover:ring-2 ring-blue-500">
+                🎵 Audio
               </div>
-              <div className="h-20 rounded bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center">
-                🎬
+              <div className="h-20 rounded bg-gradient-to-br from-blue-600/20 to-purple-600/20 flex items-center justify-center cursor-pointer hover:ring-2 ring-blue-500">
+                🎬 Video
               </div>
             </div>
           </div>
@@ -42,11 +141,30 @@ export default async function EditorPage({
             {/* Toolbar */}
             <div className="h-14 border-b flex items-center justify-between px-4">
               <div className="flex items-center gap-4">
-                <h2 className="font-semibold">Untitled Project</h2>
-                <span className="text-sm text-muted-foreground">Auto-saved</span>
+                <Input
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-64 font-semibold"
+                  placeholder="Project Name"
+                />
+                {saveStatus && (
+                  <span className={`text-sm ${saveStatus.includes("Failed") ? "text-red-500" : "text-green-500"}`}>
+                    {saveStatus}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <button className="px-3 py-1.5 text-sm border rounded hover:bg-muted">Preview</button>
+                <Button variant="outline" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {projectId ? "Save" : "Create"}
+                </Button>
+                <button className="px-3 py-1.5 text-sm border rounded hover:bg-muted">
+                  Preview
+                </button>
                 <button className="px-3 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded">
                   Export
                 </button>
@@ -59,8 +177,8 @@ export default async function EditorPage({
                 <div className="text-center">
                   <div className="text-6xl mb-4">🎬</div>
                   <p className="text-white/60">Editor Canvas</p>
-                  <p className="text-white/40 text-sm mt-2">Template: {searchParams.template || "None"}</p>
-                  {searchParams.id && <p className="text-white/40 text-sm">Editing: {searchParams.id}</p>}
+                  <p className="text-white/40 text-sm mt-2">Template: {templateId || "None"}</p>
+                  {projectId && <p className="text-white/40 text-sm">Editing: {projectId}</p>}
                 </div>
               </div>
             </div>

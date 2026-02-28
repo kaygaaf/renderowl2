@@ -1,8 +1,8 @@
-// File: /Users/minion/.openclaw/workspace/renderowl2.0/frontend/app/api/health/route.ts
-import * as entry from '../../../../../app/api/health/route.js'
+// File: /Users/minion/.openclaw/workspace/renderowl2.0/frontend/src/app/api/health/route.ts
+import * as entry from '../../../../../src/app/api/health/route.js'
 import type { NextRequest } from 'next/server.js'
 
-type TEntry = typeof import('../../../../../app/api/health/route.js')
+type TEntry = typeof import('../../../../../src/app/api/health/route.js')
 
 type SegmentParams<T extends Object = any> = T extends Record<string, any>
   ? { [K in keyof T]: T[K] extends string ? string | string[] | undefined : never }

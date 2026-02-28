@@ -1,5 +1,4 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios"
-import { auth } from "@clerk/nextjs/server"
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -10,16 +9,26 @@ const api = axios.create({
   timeout: 30000,
 })
 
+// Variable to store the getToken function
+let getTokenFn: (() => Promise<string | null>) | null = null
+
+// Function to set the token getter (called from AuthContext)
+export function setTokenGetter(fn: () => Promise<string | null>) {
+  getTokenFn = fn
+}
+
 // Request interceptor to add Clerk session token
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    // Get token from Clerk (client-side)
-    if (typeof window !== "undefined") {
-      // We're on the client, use Clerk's client-side auth
-      const { getToken } = await import("@clerk/nextjs/client")
-      const token = await getToken()
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
+    // Get token from Clerk (client-side only)
+    if (typeof window !== "undefined" && getTokenFn) {
+      try {
+        const token = await getTokenFn()
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+      } catch (error) {
+        console.error("Failed to get auth token:", error)
       }
     }
     return config
@@ -42,23 +51,6 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
-
-// Server-side API client (for Server Components)
-export async function getServerApi() {
-  const { getToken } = await auth()
-  const token = await getToken()
-
-  const serverApi = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    timeout: 30000,
-  })
-
-  return serverApi
-}
 
 // API helper functions for timelines
 export const timelineApi = {
